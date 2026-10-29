@@ -1,0 +1,152 @@
+name: EduBox CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edubox-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.8'
+
+jobs:
+  server:
+    name: Server (format, analyze, generated, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres_test:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: edubox_test
+          POSTGRES_PASSWORD: dev-only-postgres-test-password
+        ports:
+          - 9090:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d edubox_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Flutter (pinned)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install Serverpod CLI (pinned)
+        run: dart pub global activate serverpod_cli 4.0.4
+
+      - name: Add pub global bin to PATH
+        run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Bootstrap dev-only passwords
+        run: bash tool/bootstrap.sh
+
+      - name: Generate server protocol and client
+        working-directory: edubox_server
+        run: serverpod generate
+
+      - name: Stale generated code check
+        run: >-
+          git diff --exit-code --
+          edubox_server/lib/src/generated
+          edubox_server/test/integration/test_tools
+          edubox_client/lib/src/protocol
+
+      - name: Format check
+        working-directory: edubox_server
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        working-directory: edubox_server
+        run: dart analyze --fatal-infos
+
+      - name: Server tests with coverage
+        working-directory: edubox_server
+        run: dart test --coverage=coverage
+
+      - name: Format coverage report
+        working-directory: edubox_server
+        run: >-
+          dart run coverage:format_coverage
+          --lcov
+          --in=coverage
+          --out=coverage/lcov.info
+          --report-on=lib
+
+      - name: Coverage gate
+        run: dart run tool/coverage_gate.dart edubox_server/coverage/lcov.info
+
+  app:
+    name: App (analyze, format, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Flutter (pinned)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Resolve workspace
+        working-directory: edubox_flutter
+        run: flutter pub get
+
+      - name: Generate l10n
+        working-directory: edubox_flutter
+        run: flutter gen-l10n
+
+      - name: Stale l10n check
+        run: git diff --exit-code -- edubox_flutter/lib/l10n/generated
+
+      - name: Analyze
+        working-directory: edubox_flutter
+        run: flutter analyze
+
+      - name: Format check
+        working-directory: edubox_flutter
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: App tests
+        working-directory: edubox_flutter
+        run: flutter test
+
+# Android emulator E2E is intentionally not in CI yet: it needs the
+# edubox_tablet AVD and a running compose stack. docs/build/phase-1/contract.md
+# records it as a later addition.

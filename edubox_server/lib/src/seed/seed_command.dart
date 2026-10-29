@@ -83,8 +83,9 @@ const List<String> seedResetTables = [
 /// statement, calls `store.deletePrefix(session, '')` on the e2e bucket's
 /// store, then `FixtureLoader().load(session, FixtureSet.phase1())`; the
 /// delta steps look fixtures up by key through the loaded ids (query by
-/// email and class name). Acceptance tests are listed in
-/// docs/build/phase-1/contract.md section "Backend track work".
+/// email and class name). The acceptance tests are the `backend-pending`
+/// cases in `test/integration/seed/`; see
+/// docs/build/phase-1/contract.md section 2.5.
 Future<void> runSeedStep(
   Session session,
   SeedStep step, {

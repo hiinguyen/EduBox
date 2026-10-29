@@ -2,13 +2,16 @@
 .claude/
 .github/hooks/
 
-# Dart and Flutter tool output (any package in the workspace)
+# Dart and Flutter tool output (any package in the workspace). Anchored so
+# docs/build/ and any .github/ path are always tracked.
 .dart_tool/
-build/
-coverage/
+/build/
+/edubox_server/build/
+/edubox_flutter/build/
+/edubox_client/build/
+/edubox_fixtures/build/
+/edubox_server/coverage/
+/edubox_flutter/coverage/
 
 # Secrets: created from passwords.example.yaml by tool/bootstrap.sh
 edubox_server/config/passwords.yaml
-
-# Pipeline ledgers (subagent-driven development)
-.superpowers/
