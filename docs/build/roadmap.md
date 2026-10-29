@@ -22,7 +22,7 @@ Notes on commands:
 
 | Phase | Goal | Status | Branch | Contract tag | Gate round | Updated |
 |---|---|---|---|---|---|---|
-| 1 | Each role signs in to a Vietnamese UI and lands on its own home; student sees only approved content; a streaming function reaches the app | shaping | phase-1 | - | - | 2026-10-29 |
+| 1 | Each role signs in to a Vietnamese UI and lands on its own home; student sees only approved content; a streaming function reaches the app | contracting | phase-1 | - | - | 2026-10-29 |
 | 2 | Teacher uploads and approves content; student reads, watches, and downloads it for offline use | planned | - | - | - | - |
 | 3 | Teacher assigns a lesson-linked practice exercise; student submits (online or offline); auto-grade result shows on the teacher dashboard | planned | - | - | - | - |
 | 4 | Student chats with a streaming, scoped, rate-limited AI tutor; every exchange is logged by the server | planned | - | - | - | - |
@@ -203,6 +203,7 @@ Status values, in order: planned, shaping, contracting, planning, building, inte
 - 2026-10-29 User decision: contentIngest scope -> validation plus metadata normalization only, no transcoding.
 - 2026-10-29 User decision: parent view -> results and full AI transcripts only, no lesson-completion progress.
 - 2026-10-29 User decision: design direction (K3) -> approved docs/design/app-direction.md: achromatic-ledger, accent ink-blue #1F4C8F, Bitter / Be Vietnam Pro / IBM Plex Mono bundled offline.
+- 2026-10-29 User decision: phase 1 shape briefs (P1) -> confirmed: only built destinations in nav; rows not tappable in phase 1; student-home greeting + newest 4 + Mở thư viện; sign-out confirm for students only; library grouped by subject incl. exercises; teacher-home class ledger; parent-home name only; account-not-set-up with Kiểm tra lại + Đăng xuất. Briefs in docs/design/shapes/.
 - 2026-10-29 Ruling: PRODUCT.md and the DESIGN.md seed were already approved, so K3 skipped the impeccable interviews.
 - 2026-10-29 Ruling: riskiest integrations first - phase 1 proves custom-claim roles, Firestore rules, l10n, and a streaming callable against the emulators end to end before feature work - cost if wrong: late discovery that E2E or streaming against the emulators is unreliable invalidates later exit criteria.
 - 2026-10-29 Ruling: `contentIngest` scope is validation (type, size, readability) plus metadata normalization (MIME, size, page count or duration); it does no transcoding or format conversion, which narrows the spec's "validates/transforms" for the prototype - confirmed by the user.
