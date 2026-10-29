@@ -1,0 +1,57 @@
+EduBox font and contrast check - 2026-10-29
+Source files: github.com/google/fonts main (ofl/bevietnampro, ofl/bitter, ofl/ibmplexmono); checked with fontTools.
+Set: every precomposed Vietnamese letter (upper and lower, incl. đ Đ), combining U+0300 0301 0302 0303 0306 0309 031B 0323, digits, punctuation, U+20AB.
+
+BeVietnamPro-Medium.ttf: missing=none combining_missing=none tnum=False mark/mkmk=True/True winAsc/Desc=1261/265 hhea=1000/-265 tallestVN=1151/-234 upm=1000 glyphs=527
+BeVietnamPro-Regular.ttf: missing=none combining_missing=none tnum=False mark/mkmk=True/True winAsc/Desc=1261/265 hhea=1000/-265 tallestVN=1147/-227 upm=1000 glyphs=527
+BeVietnamPro-SemiBold.ttf: missing=none combining_missing=none tnum=False mark/mkmk=True/True winAsc/Desc=1261/265 hhea=1000/-265 tallestVN=1155/-240 upm=1000 glyphs=527
+Bitter[wght].ttf: missing=none combining_missing=none tnum=True mark/mkmk=True/True winAsc/Desc=1255/376 hhea=935/-265 tallestVN=945/-236 upm=1000 glyphs=1542
+IBMPlexMono-Medium.ttf: missing=none combining_missing=none tnum=False mark/mkmk=True/False winAsc/Desc=1025/275 hhea=1025/-275 tallestVN=1097/-200 upm=1000 glyphs=1033
+IBMPlexMono-Regular.ttf: missing=none combining_missing=none tnum=False mark/mkmk=True/False winAsc/Desc=1025/275 hhea=1025/-275 tallestVN=1075/-200 upm=1000 glyphs=1033
+
+Digit advance widths (tabular when one value):
+  BeVietnamPro-Medium.ttf [400, 595, 645, 655, 667, 684, 687, 713] | tnum feature: False
+  BeVietnamPro-Regular.ttf [385, 594, 634, 651, 660, 676, 680, 710] | tnum feature: False
+  BeVietnamPro-SemiBold.ttf [415, 596, 656, 660, 674, 692, 693, 716] | tnum feature: False
+  Bitter[wght].ttf [381, 467, 522, 525, 560, 564, 581, 582, 601, 648] | tnum feature: True
+  IBMPlexMono-Medium.ttf [600] | tnum feature: False
+  IBMPlexMono-Regular.ttf [600] | tnum feature: False
+
+Licence: all three families SIL OFL 1.1. RFN: none on Bitter or Be Vietnam Pro; IBM Plex reserves 'Plex' (ship unmodified).
+
+WCAG 2.1 contrast:
+ink        #191E29 on paper      #F4F5F8: 15.30:1
+ink        #191E29 on sheet      #FFFFFF: 16.68:1
+ink        #191E29 on active     #E6E9EF: 13.71:1
+muted      #4E5666 on paper      #F4F5F8:  6.77:1
+muted      #4E5666 on sheet      #FFFFFF:  7.38:1
+muted      #4E5666 on active     #E6E9EF:  6.07:1
+disabled   #8C93A0 on sheet      #FFFFFF:  3.09:1
+disabled   #8C93A0 on paper      #F4F5F8:  2.83:1
+accent     #1F4C8F on sheet      #FFFFFF:  8.44:1
+accent     #1F4C8F on paper      #F4F5F8:  7.74:1
+sheet      #FFFFFF on accent     #1F4C8F:  8.44:1
+accentInk  #13305C on accentPale #E5ECF6: 11.00:1
+accent     #1F4C8F on accentPale #E5ECF6:  7.10:1
+control    #7D8594 on sheet      #FFFFFF:  3.71:1
+control    #7D8594 on paper      #F4F5F8:  3.41:1
+rule       #DFE3EA on sheet      #FFFFFF:  1.29:1
+rule       #DFE3EA on paper      #F4F5F8:  1.18:1
+active     #E6E9EF on sheet      #FFFFFF:  1.22:1
+paper      #F4F5F8 on sheet      #FFFFFF:  1.09:1
+pos        #1E6F45 on sheet      #FFFFFF:  6.15:1
+pos        #1E6F45 on paper      #F4F5F8:  5.64:1
+posInk     #0E4026 on posBg      #E2F2E8: 10.17:1
+posBd      #A9D5BA on posBg      #E2F2E8:  1.40:1
+note       #8A5300 on sheet      #FFFFFF:  6.33:1
+note       #8A5300 on paper      #F4F5F8:  5.81:1
+noteInk    #5E3800 on noteBg     #FDF3D7:  9.30:1
+neg        #B3261E on sheet      #FFFFFF:  6.54:1
+neg        #B3261E on paper      #F4F5F8:  6.00:1
+sheet      #FFFFFF on neg        #B3261E:  6.54:1
+negInk     #7A1A14 on negBg      #FBE9E7:  9.02:1
+neuInk     #2E3440 on neuBg      #ECEEF2: 10.75:1
+neu        #4E5666 on sheet      #FFFFFF:  7.38:1
+accent     #1F4C8F on ink        #191E29:  1.98:1
+oxblood    #7A2531 on sheet      #FFFFFF:  9.83:1
+oxblood    #7A2531 on neg        #B3261E:  1.50:1

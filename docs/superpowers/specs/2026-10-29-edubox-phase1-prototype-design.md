@@ -3,6 +3,7 @@
 ## Status
 
 Approved by Hii on 2026-10-29.
+Amended 2026-10-29 with Hii's build-kickoff decisions: account provisioning, content `status`/`classIds`, class `gradeLevel`/`subjects`, server-only `aiChats` writes with teacher and parent read access, Vietnamese UI, AI daily limit, and test start/late-submission rules.
 Scope: Phase 1 only (Android app prototype).
 Phase 2 (locked study/kiosk mode) and Phase 3 (custom EduBox hardware device) are noted as future direction and are explicitly out of scope for this spec.
 
@@ -61,17 +62,28 @@ One Flutter app serves all three roles, gated by a custom claim on the Firebase 
 ## Data model (Firestore)
 
 - `users`: `{uid, role: student|teacher|parent, name, classIds[], linkedParentUid?}`
-- `classes`: `{classId, teacherUid, name, studentUids[]}`
-- `content`: `{contentId, type: ebook|video|exercise, subject, gradeLevel, title, storagePath, approvedBy: teacherUid, createdAt}`. Only content with `approved` status is visible to students - this is the in-app enforcement point for "no unapproved content."
+- `classes`: `{classId, teacherUid, name, gradeLevel, subjects[], studentUids[]}`. `gradeLevel` and `subjects[]` scope the AI tutor (see AI tutor flow).
+- `content`: `{contentId, type: ebook|video|exercise, subject, gradeLevel, title, storagePath, classIds[], status: draft|approved, approvedBy: teacherUid, createdAt}`. Only content with `status == approved` for one of the student's classes is visible to students - this is the in-app enforcement point for "no unapproved content." The owning teacher approves content explicitly.
 - `assignments`: `{assignmentId, classId, contentId, dueAt, type: practice|test}`
 - `submissions`: `{submissionId, assignmentId, studentUid, answers[], score, gradedAt, gradedBy: auto|teacher}`
 - `aiChats`: `{chatId, studentUid, messages[], subject, createdAt}`. Retained so teachers/parents can review what the AI discussed with the student.
 
 ### Firestore security rules
 
-- Students: read only `content` where `approved == true`; write only their own `submissions` and `aiChats`.
-- Teachers: read/write `content` and `assignments` scoped to their own `classIds`.
-- Parents: read-only access to `submissions` and `aiChats` summaries for their linked student only.
+- Students: read only `content` where `status == approved` for one of their classes; write only their own `submissions`; read their own `aiChats`.
+- `aiChats` is written only by the `aiProxy` Cloud Function, never by a client, so a student cannot forge the log or bypass the test lockout.
+- Teachers: read/write `content` and `assignments` scoped to their own `classIds`; read `aiChats` of students in their own classes.
+- Parents: read-only access to `submissions` and full `aiChats` transcripts for their linked student only.
+
+### Accounts and roles
+
+Phase 1 has no sign-up screen.
+An admin/seed script creates accounts, sets the role custom claim, and links each student to one parent.
+Users sign in with email and password.
+
+### Language
+
+The UI is Vietnamese, built on Flutter's localization system (ARB files) so further languages can be added later.
 
 ## AI tutor flow (OpenRouter)
 
@@ -79,7 +91,7 @@ One Flutter app serves all three roles, gated by a custom claim on the Firebase 
 2. Flutter app calls the `aiProxy` Cloud Function; the client never calls OpenRouter directly.
 3. `aiProxy`:
    - Loads a system prompt constraining the model to the student's subject/grade level and to study-help behavior only (no off-topic chat, no answering flagged test-mode questions, age-appropriate tone).
-   - Applies a per-student rate limit (Firestore counter, e.g. N messages/day) for cost and misuse control.
+   - Applies a per-student rate limit (Firestore counter, default 30 messages/day, day boundary in Asia/Ho_Chi_Minh, set as a function parameter) for cost and misuse control.
    - Calls OpenRouter with a model configured in Function config (not hardcoded in the client), so the model can be swapped or A/B tested without a client release.
    - Logs the exchange to `aiChats`.
 4. Response streams back to the app.
@@ -90,7 +102,9 @@ The OpenRouter API key lives only in Cloud Functions configuration, never in the
 ## Test/exam room
 
 - A teacher creates an assignment with `type: test`, a time limit, and a set of MCQ/objective questions.
+- Starting a test requires connectivity, so the server records `startedAt` and can lock the AI tutor; losing connectivity after the start does not interrupt the test.
 - The app enforces the time limit locally and auto-submits on expiry.
+- The server accepts a submission that arrives after `startedAt` + time limit + a grace period, but flags it "late" for the teacher instead of rejecting it.
 - On submission, `autoGrade` scores objective items immediately; results surface in the teacher dashboard and the parent summary view.
 - AI tutor access is disabled for the duration of an active test (see AI tutor flow above).
 
