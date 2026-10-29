@@ -1,5 +1,7 @@
 <!-- Confirmed by Hii on 2026-10-29 (P1, phase 1). Every ASSUMPTION below is accepted as written unless the "Confirmed decisions" list overrides it. -->
 
+> Backend changed on 2026-10-29: Firebase is replaced by a Serverpod server with PostgreSQL (see the amended spec). Read every Firestore, snapshot, `isFromCache`, custom-claim, or Firebase error reference below as its equivalent in the phase 1 contract: the app's local store and outbox, the server-stored role, and the contract's error shapes. The screen behavior and states are unchanged.
+
 ## Confirmed decisions (Hii, 2026-10-29)
 
 - Navigation shows only destinations whose screens exist; no disabled or "coming soon" items.
