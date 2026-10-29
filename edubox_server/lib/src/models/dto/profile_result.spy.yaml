@@ -1,0 +1,8 @@
+# Invariant: status == ready <=> profile != null.
+class: ProfileResult
+fields:
+  status: ProfileStatus
+  profile: Profile?
+  # The email of the signed-in auth user (shown on account-not-set-up), or
+  # null when the auth user has no email identity.
+  signedInEmail: String?

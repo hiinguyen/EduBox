@@ -1,0 +1,8 @@
+# Integration tests share the compose `postgres_test` service.
+tags:
+  integration: {}
+  # Contract-specified tests whose implementation belongs to the backend
+  # track. They are skipped until the track implements them and removes the
+  # tag (see docs/build/phase-1/contract.md "Backend track work").
+  backend-pending:
+    skip: 'Backend track: implement, then remove the backend-pending tag.'

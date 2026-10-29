@@ -1,0 +1,9 @@
+# Why the authorization guard denied a call. Unauthenticated callers are
+# normally rejected by Serverpod before the guard runs (requireLogin), and the
+# guard repeats the check as a second line of defence.
+enum: AccessDeniedReason
+serialized: byName
+values:
+  - unauthenticated
+  - notSetUp
+  - wrongRole

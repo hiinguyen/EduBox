@@ -1,0 +1,9 @@
+# The three EduBox roles. The database stores the role as raw text in
+# `users.role` so that a null or unknown value is representable and answers
+# `profile.me` with `notSetUp` instead of a deserialization error.
+enum: UserRole
+serialized: byName
+values:
+  - student
+  - teacher
+  - parent

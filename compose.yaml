@@ -1,0 +1,139 @@
+# EduBox local stack (phase 1). Everything here is dev-only.
+#
+#   docker compose up -d --wait                  # postgres, postgres_test, minio
+#   docker compose run --rm minio-init           # create the private buckets
+#   docker compose --profile e2e up -d --build --wait   # + the server
+#   docker compose run --rm seed [--step reset]  # reset and seed demo data
+#
+# Passwords below match edubox_server/config/passwords.example.yaml and only
+# unlock containers on this machine. Redis is not used.
+name: edubox
+
+services:
+  postgres:
+    image: ghcr.io/serverpod/postgres:16
+    ports:
+      - "8090:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: edubox
+      POSTGRES_PASSWORD: dev-only-postgres-password
+    volumes:
+      - edubox_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d edubox"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Throwaway database for Serverpod's test tools; data lives in memory.
+  postgres_test:
+    image: ghcr.io/serverpod/postgres:16
+    ports:
+      - "9090:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: edubox_test
+      POSTGRES_PASSWORD: dev-only-postgres-test-password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d edubox_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # S3-compatible object storage. The upstream minio/minio images are no
+  # longer published; pgsty/minio is the community-maintained MinIO fork.
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: edubox-dev
+      MINIO_ROOT_PASSWORD: dev-only-minio-password
+    volumes:
+      - edubox_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The EduBox server for e2e runs: development database, e2e bucket, signed
+  # URLs for the emulator (10.0.2.2), migrations applied at start.
+  server:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: edubox_server/Dockerfile
+    command: ["--mode", "development", "--apply-migrations"]
+    ports:
+      - "8080:8080"
+    environment:
+      SERVERPOD_DATABASE_HOST: postgres
+      SERVERPOD_DATABASE_PORT: "5432"
+      EDUBOX_STORAGE_ENDPOINT: http://minio:9000
+      EDUBOX_STORAGE_PUBLIC_ENDPOINT: http://10.0.2.2:9000
+      EDUBOX_STORAGE_BUCKET: edubox-e2e
+      EDUBOX_E2E_CONTROL: "true"
+    volumes:
+      - ./edubox_server/config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      # /readyz answers only after migrations were applied and the database
+      # is reachable.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+
+  # One-shot: creates the private buckets (idempotent).
+  minio-init:
+    profiles: ["tools"]
+    image: pgsty/mc:RELEASE.2026-08-04T00-00-00Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 edubox-dev dev-only-minio-password
+        for bucket in edubox-dev edubox-test edubox-e2e; do
+          mc mb --ignore-existing "local/$$bucket"
+          mc anonymous set none "local/$$bucket"
+        done
+
+  # One-shot: resets and seeds the development database and the e2e bucket.
+  # Run only after the `server` healthcheck passes (migrations applied).
+  seed:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: edubox_server/Dockerfile
+    entrypoint: ["./bin/seed", "--mode", "development"]
+    environment:
+      SERVERPOD_DATABASE_HOST: postgres
+      SERVERPOD_DATABASE_PORT: "5432"
+      EDUBOX_STORAGE_ENDPOINT: http://minio:9000
+      EDUBOX_STORAGE_PUBLIC_ENDPOINT: http://10.0.2.2:9000
+      EDUBOX_STORAGE_BUCKET: edubox-e2e
+    volumes:
+      - ./edubox_server/config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  edubox_data:
+  edubox_minio:

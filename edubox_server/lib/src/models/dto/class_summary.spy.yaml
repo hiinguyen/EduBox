@@ -1,0 +1,9 @@
+# One row of the teacher's class ledger (`classes.mine`).
+class: ClassSummary
+fields:
+  id: int
+  name: String
+  gradeLevel: int
+  # Teacher-ordered; may be empty.
+  subjects: List<String>
+  studentCount: int

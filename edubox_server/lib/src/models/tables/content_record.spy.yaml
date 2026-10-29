@@ -1,0 +1,18 @@
+# Content metadata. `storagePath` points into the private object store
+# (phase 2); phase 1 fixtures have none.
+class: ContentRecord
+serverOnly: true
+table: content
+fields:
+  ownerTeacherId: int, relation(parent=users, onDelete=Restrict)
+  type: ContentType
+  subject: String
+  gradeLevel: int
+  title: String
+  storagePath: String?
+  status: ContentStatus
+  approvedBy: int?, relation(parent=users, onDelete=SetNull)
+  createdAt: DateTime
+indexes:
+  content_status_idx:
+    fields: status

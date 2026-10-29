@@ -1,0 +1,13 @@
+# Class membership: one row per student in a class.
+class: ClassMember
+serverOnly: true
+table: class_members
+fields:
+  classId: int, relation(parent=classes, onDelete=Cascade)
+  studentId: int, relation(parent=users, onDelete=Cascade)
+indexes:
+  class_members_class_student_idx:
+    fields: classId, studentId
+    unique: true
+  class_members_student_idx:
+    fields: studentId

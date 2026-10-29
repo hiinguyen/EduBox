@@ -1,3 +1,14 @@
 .agents/
 .claude/
-.github/
+.github/hooks/
+
+# Dart and Flutter tool output (any package in the workspace)
+.dart_tool/
+build/
+coverage/
+
+# Secrets: created from passwords.example.yaml by tool/bootstrap.sh
+edubox_server/config/passwords.yaml
+
+# Pipeline ledgers (subagent-driven development)
+.superpowers/

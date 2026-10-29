@@ -1,0 +1,43 @@
+# Development run mode: the local Docker Compose stack.
+# Host-side runs use these values; the compose `server` and `seed` services
+# override hosts through SERVERPOD_* and EDUBOX_* environment variables.
+# Secrets are in the git-ignored config/passwords.yaml (tool/bootstrap.sh).
+
+apiServer:
+  port: 8080
+  publicHost: localhost
+  publicPort: 8080
+  publicScheme: http
+
+insightsServer:
+  port: 8081
+  publicHost: localhost
+  publicPort: 8081
+  publicScheme: http
+
+database:
+  host: localhost
+  port: 8090
+  name: edubox
+  user: postgres
+
+# Redis is disabled in every run mode.
+redis:
+  enabled: false
+
+maxRequestSize: 524288
+
+sessionLogs:
+  persistentEnabled: true
+  consoleEnabled: true
+  consoleLogFormat: text
+
+# EduBox settings (non-secret). See lib/src/config/edubox_config.dart.
+edubox:
+  storage:
+    endpoint: http://localhost:9000
+    # The Android emulator reaches the host's MinIO at 10.0.2.2.
+    publicEndpoint: http://10.0.2.2:9000
+    bucket: edubox-dev
+    region: us-east-1
+  e2eControl: false

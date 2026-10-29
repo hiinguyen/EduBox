@@ -1,0 +1,48 @@
+name: edubox_flutter
+description: EduBox Android app (phase 1 contract scaffold).
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+  flutter: ^3.44.4
+
+resolution: workspace
+
+dependencies:
+  drift: '>=2.34.0 <2.35.0'
+  edubox_client:
+    path: ../edubox_client
+  edubox_fixtures:
+    path: ../edubox_fixtures
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  path: ^1.9.0
+  path_provider: ^2.1.6
+  serverpod_auth_idp_flutter: 4.0.4
+  serverpod_flutter: 4.0.4
+  sqlite3: ^3.8.0
+
+dev_dependencies:
+  analyzer: any
+  build_runner: '>=2.10.0 <2.17.0'
+  # Pinned: serverpod_database 4.0.4 needs sqlparser ^0.44 in the shared
+  # workspace resolution; drift_dev 2.34.1+1 is the newest unretracted release on
+  # sqlparser 0.44.
+  drift_dev: 2.34.1+1
+  flutter_lints: '>=3.0.0 <7.0.0'
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+dependency_overrides:
+  flutter_secure_storage: ^10.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true

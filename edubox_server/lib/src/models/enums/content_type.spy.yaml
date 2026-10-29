@@ -1,0 +1,6 @@
+enum: ContentType
+serialized: byName
+values:
+  - ebook
+  - video
+  - exercise

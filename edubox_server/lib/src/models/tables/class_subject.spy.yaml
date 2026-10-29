@@ -1,0 +1,12 @@
+# `classes.subjects[]` as a join table; `position` keeps the teacher's order.
+class: ClassSubject
+serverOnly: true
+table: class_subjects
+fields:
+  classId: int, relation(parent=classes, onDelete=Cascade)
+  position: int
+  subject: String
+indexes:
+  class_subjects_class_position_idx:
+    fields: classId, position
+    unique: true
