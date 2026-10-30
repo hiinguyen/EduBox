@@ -189,7 +189,7 @@ copy is the brief's proposed copy; the keys are the contract.
 `BackendError`. A stream throws `BackendException(error)` because a stream
 cannot return a result per event.
 
-### 2.5 Implemented now versus backend-track stubs
+### 2.5 Implemented now
 
 Implemented and tested now:
 
@@ -201,8 +201,11 @@ Implemented and tested now:
 - Configuration loader, object-store interface, seed-step CLI enum and reset
   table list, database coverage of the authorization module (95.5% line
   coverage; gate passes).
+- `S3ObjectStore` against MinIO, the four `runSeedStep` steps, the `bin/seed` CLI and its Dockerfile target; the compose `seed` service runs `./bin/seed`.
 - The authorization matrix, sign-in, profile, classes, library, ping-stream
   and module-endpoint integration suites.
+- `test/integration/storage/object_store_test.dart`, which runs against MinIO and covers put, byte-identical get, the public-host signed URL, unsigned-read denial, expiry and `deletePrefix`.
+- `test/integration/seed/seed_command_test.dart`, which covers the exact fixture identities, roles, links, class membership, content status/scope, seeded credentials, reset idempotency, e2e bucket emptying, the reconnect deltas, `assign-role` and `runSeedCli`.
 
 Sign-in tests use `rollbackDatabase: RollbackDatabase.disabled` and seed once
 per group: `emailIdp.login` opens its own transaction for the rate limiter,
@@ -210,23 +213,8 @@ which the test-tool rollback wrapper cannot nest. The wrong-password and
 unknown-email calls are awaited sequentially for the same reason. This is a
 test-harness requirement, not a product exception.
 
-Stubs for the backend track, with failing tests marked `backend-pending`:
+Remaining frontend-track seams:
 
-- `S3ObjectStore` in `edubox_server/lib/src/storage/object_store.dart`: all four
-  methods throw `UnimplementedError`. The storage spike lands with
-  `serverpod_cloud_storage_s3_compat` against MinIO.
-  `test/integration/storage/object_store_test.dart` is tagged
-  `backend-pending`; it asserts put, byte-identical get, a signed URL whose
-  host is the configured public endpoint, an unsigned read denial, expiry, and
-  `deletePrefix`.
-- `runSeedStep` in `edubox_server/lib/src/seed/seed_command.dart` throws
-  `UnimplementedError`. `test/integration/seed/seed_command_test.dart` is
-  tagged `backend-pending`; it asserts the exact fixture identities, roles,
-  links, class membership, content status/scope, seeded credentials, reset
-  idempotency, e2e bucket emptying, the reconnect deltas and `assign-role`.
-  The `bin/seed` executable and its Dockerfile target are also part of this
-  stub; the compose `seed` service entrypoint (`./bin/seed`) stays unrunnable
-  until the backend track adds them.
 - The production `NetworkController` source (connectivity events plus a server
   reachability probe) is the frontend track's implementation of the contract
   interface; phase 1 ships the seam and a directly switchable test controller.
@@ -234,9 +222,7 @@ Stubs for the backend track, with failing tests marked `backend-pending`:
   cache/network data layer described in 3.4-3.5) are the frontend track's
   phase 5 seam.
 
-`dart_test.yaml` skips the `backend-pending` tag with a clear message. Remove
-the tag once the implementation lands; the tests then run against real
-PostgreSQL/MinIO and must pass without weakening.
+`dart_test.yaml` no longer defines the retired skip tag; every phase 1 suite runs for real, with PostgreSQL and MinIO available, and must pass without weakening.
 
 ### 2.6 Seed command
 
@@ -298,12 +284,8 @@ approved video for 9A, and the 7B grammar item. The library oracle is
 from `StorageConfig`, and a second client configured with `publicEndpoint` for
 presigned URLs only. The server reaches MinIO at `minio:9000` in compose and
 `localhost:9000` from host tests; the AVD needs `10.0.2.2:9000` in the signed
-host. `minio-init` creates the private `edubox-dev`, `edubox-test` and
-`edubox-e2e` buckets and denies anonymous access. The interface is implemented
-by the backend track; phase 1 tests for it are `backend-pending`. Those tests
-assert the signed URL's host is `publicEndpoint` (not `endpoint`), that an
-unsigned read is denied, that a 1-second URL expires, and that `deletePrefix`
-removes only the matching prefix.
+host. `minio-init` creates the private `edubox-dev`, `edubox-test` and `edubox-e2e` buckets and denies anonymous access.
+`S3ObjectStore` is implemented; `test/integration/storage/object_store_test.dart` runs against MinIO and asserts put, byte-identical get, a signed URL whose host is `publicEndpoint` (not `endpoint`), an unsigned read denial, a 1-second URL expiry, and `deletePrefix` removing only the matching prefix.
 
 ### 2.8 E2E control route
 
@@ -765,10 +747,8 @@ docker compose run --rm minio-init
   --dart-define=EDUBOX_SERVER_URL=http://10.0.2.2:8080/)
 ```
 
-The integration test calls `e2e.run(step: 'reset')` over the API before its
-first assertion, then fresh state comes from `e2e.run` mid-run. The `seed`
-service remains the host/CI path and is not required by the AVD run until the
-backend track adds `bin/seed`.
+The integration test calls `e2e.run(step: 'reset')` over the API before its first assertion, then fresh state comes from `e2e.run` mid-run.
+The `seed` service is the host/CI path and is not required by the AVD run; `bin/seed` is compiled into the server image and `runSeedCli` is covered by `test/integration/seed/seed_command_test.dart`.
 
 Docker networking: the commands above use the normal bridge network. Only if a
 host cannot create veth interfaces (Docker bridge failure), use
@@ -795,7 +775,7 @@ seams are changed only through a contract change.
 | Owner | Paths | Notes |
 | --- | --- | --- |
 | Contract (frozen) | `edubox_server/lib/src/models/**`, `migrations/**`, `lib/src/authz/**`, `lib/src/profile/**`, `lib/src/classes/**`, `lib/src/content/**`, `lib/src/diagnostics/**`, `lib/src/auth/**`, `lib/src/config/**`, `lib/src/e2e/**`, `lib/src/generated/**`, `lib/src/storage/object_store.dart` interface, `lib/src/seed/fixture_loader.dart`, `lib/server.dart`, `bin/main.dart`, `config/**` (except the git-ignored `passwords.yaml`), `web/**`, `analysis_options.yaml`, `dart_test.yaml`, `edubox_server/test/integration/authorization/**`, `auth/**`, `contract/**`, `support/**`, `test_tools/**`, `e2e/**`, `classes/**`, `content/**`, `profile/**`, `diagnostics/**`, `edubox_client/**`, `edubox_fixtures/**`, `compose.yaml`, `.dockerignore`, `.gitignore`, `tool/bootstrap.sh`, `tool/coverage_gate.dart`, `.github/workflows/ci.yml`, root `pubspec.yaml` workspace/SDK section, `docs/build/phase-1/**` | Change only with a contract change; backend fixes inside a method body are allowed if signatures and DTOs stay fixed. |
-| Backend track | Stub method bodies in `edubox_server/lib/src/storage/object_store.dart`, `lib/src/seed/seed_command.dart`, `bin/seed.dart`, `edubox_server/Dockerfile` (including the seed build target; the entrypoint section is frozen by this contract), `edubox_server/pubspec.yaml` dependencies, `edubox_server/test/integration/storage/**`, `edubox_server/test/integration/seed/**` (remove `backend-pending` tags) | Storage spike, seed command, MinIO setup. |
+| Backend track | Implementation in `edubox_server/lib/src/storage/object_store.dart`, `lib/src/seed/seed_command.dart`, `bin/seed.dart`, `edubox_server/Dockerfile` (including the seed build target; the entrypoint section is frozen by this contract), `edubox_server/pubspec.yaml` dependencies, `edubox_server/test/integration/storage/**`, `edubox_server/test/integration/seed/**` | Storage spike, seed command, seed CLI, MinIO setup. |
 | Frontend track | `edubox_flutter/lib/main.dart`, `lib/src/app/**`, `lib/src/shell/**`, `lib/src/screens/**`, `lib/src/features/**`, `lib/src/data/**` (repository implementations), `lib/src/network/**` (production network source), `lib/src/theme/**`, `edubox_flutter/android/**`, `edubox_flutter/assets/**` (fonts and images), `edubox_flutter/pubspec.yaml` dependencies, `edubox_flutter/analysis_options.yaml`, `edubox_flutter/test/**` except `test/contract/**`, `test/local/**`, `test/l10n/**`, and `integration_test/**` | Screens, theme tokens, bundled fonts, production repositories and network probe, and the unit tests for the data and network layers (`test/data/**`, `test/network/**`, `test/app/**`, `test/widget/**`). |
 | Contract (app) | `edubox_flutter/lib/src/contract/**`, `lib/src/fake/**`, `lib/src/local/local_store.dart` + `local_store.g.dart`, `lib/l10n/app_vi.arb`, `lib/l10n/generated/**`, `l10n.yaml`, `test/contract/**`, `test/local/**`, `test/l10n/**` | The interfaces, fake, cache schema, ARB keys and their tests. |
 
@@ -808,9 +788,8 @@ workspace list, SDK constraint or those shared pins is a contract change.
 
 ## 7. Open items
 
-- No product decision blocks phase 1. The only deliberate gaps are the
-  backend-track stubs in section 2.5; they are marked with skipped tests and
-  must be removed before the phase 1 gate.
+- No product decision blocks phase 1.
+  No backend-track stub remains: `S3ObjectStore`, `runSeedStep` and `bin/seed` are implemented and tested as section 2.5 records.
 - Android emulator E2E is not part of CI yet (section 4); it needs the AVD,
   the `e2e` compose profile and `flutter test integration_test`. Server state
   is reset through `e2e.run`, so it no longer waits on the seed CLI.
