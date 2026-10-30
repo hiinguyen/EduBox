@@ -8,6 +8,7 @@ import 'package:edubox_client/edubox_client.dart'
         ProfileStatus,
         StudentLibrary,
         UserRole;
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../contract/backend.dart';
 import '../contract/backend_result.dart';
@@ -84,20 +85,26 @@ class CachedBackend implements EduBoxBackend {
   }
 
   Future<void> _refreshAfterReconnect() async {
-    final cached = await store.readSession();
-    if (cached == null) return;
-    final me = await profile.me();
-    final session = me.valueOrNull;
-    if (session == null || session.status != ProfileStatus.ready) return;
-    switch (session.profile?.role) {
-      case UserRole.student:
-        await library.library();
-      case UserRole.teacher:
-        await classes.mine();
-      case UserRole.parent:
-        await parent.home();
-      case null:
-        break;
+    try {
+      final cached = await store.readSession();
+      if (cached == null) return;
+      final me = await profile.me();
+      final session = me.valueOrNull;
+      if (session == null || session.status != ProfileStatus.ready) return;
+      switch (session.profile?.role) {
+        case UserRole.student:
+          await library.library();
+        case UserRole.teacher:
+          await classes.mine();
+        case UserRole.parent:
+          await parent.home();
+        case null:
+          break;
+      }
+    } catch (error, stackTrace) {
+      // A background refresh has no caller to report to; never let it become
+      // an uncaught async error in the app zone.
+      debugPrint('EduBox reconnect refresh failed: $error\n$stackTrace');
     }
   }
 
@@ -150,10 +157,21 @@ class _Auth implements AuthRepository {
     final normalized = email.trim().toLowerCase();
     return b._guard(() async {
       await b.api.login(email: normalized, password: password);
-      final result = await b.api.profileMe();
-      final session = await b._saveProfile(result, normalized);
-      final saved = await b.store.readSession();
-      return BackendOk(session, cachedAt: saved?.cachedAt);
+      try {
+        final result = await b.api.profileMe();
+        final session = await b._saveProfile(result, normalized);
+        final saved = await b.store.readSession();
+        return BackendOk(session, cachedAt: saved?.cachedAt);
+      } catch (_) {
+        // The login already stored the auth session; a failed post-login step
+        // must not leave it behind for the next start to restore.
+        try {
+          await b.api.clearStoredAuth();
+        } catch (_) {
+          // Preserve the original sign-in failure.
+        }
+        rethrow;
+      }
     });
   }
 
@@ -173,10 +191,26 @@ class _Auth implements AuthRepository {
       return const BackendOk(null);
     }
     final result = await _refresh();
-    if (result case BackendFailure(error: SessionExpiredError())) {
-      await b.api.clearStoredAuth();
-      await b.store.clearAll();
-      return const BackendOk(null);
+    if (result case BackendFailure(:final error)) {
+      switch (error) {
+        case SessionExpiredError():
+          await b.api.clearStoredAuth();
+          await b.store.clearAll();
+          return const BackendOk(null);
+        case BackendUnreachableError():
+          // The probe passed but the request did not: cold start on a flaky
+          // link falls back to the cached role home instead of an error.
+          final cached = await b.store.readSession();
+          if (cached != null) {
+            return BackendOk(
+              cached.value,
+              cachedAt: cached.cachedAt,
+              isStale: true,
+            );
+          }
+        default:
+          break;
+      }
     }
     return result;
   }
@@ -208,10 +242,12 @@ class _Auth implements AuthRepository {
         await b.api.signOut();
       } catch (_) {
         // Best effort: the local session is cleared below regardless.
-        await b.api.clearStoredAuth();
       }
-    } else {
+    }
+    try {
       await b.api.clearStoredAuth();
+    } catch (error) {
+      return BackendFailure(mapApiError(error));
     }
     try {
       await b.store.clearAll();

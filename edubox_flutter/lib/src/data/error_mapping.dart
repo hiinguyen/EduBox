@@ -5,7 +5,11 @@ import 'package:edubox_client/edubox_client.dart'
     show
         AccessDeniedException,
         AccessDeniedReason,
+        MethodStreamException,
+        OpenMethodStreamException,
+        OpenMethodStreamResponseType,
         ServerpodClientException,
+        ServerpodClientForbidden,
         ServerpodClientNetworkException,
         ServerpodClientUnauthorized;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
@@ -37,11 +41,22 @@ BackendError mapApiError(Object error) => switch (error) {
     AccessDeniedReason.wrongRole => const PermissionDeniedError(),
     AccessDeniedReason.unauthenticated => const SessionExpiredError(),
   },
+  OpenMethodStreamException(:final responseType) => switch (responseType) {
+    OpenMethodStreamResponseType.authenticationFailed =>
+      const SessionExpiredError(),
+    OpenMethodStreamResponseType.authorizationDeclined =>
+      const PermissionDeniedError(),
+    _ => UnexpectedBackendError(error),
+  },
+  // Every other MethodStreamException is a broken transport: the WebSocket
+  // failed to connect, timed out, closed, or stopped listening.
+  MethodStreamException() => const BackendUnreachableError(),
   ServerpodClientUnauthorized() ||
   RefreshTokenExpiredException() ||
   RefreshTokenInvalidSecretException() ||
   RefreshTokenMalformedException() ||
   RefreshTokenNotFoundException() => const SessionExpiredError(),
+  ServerpodClientForbidden() => const PermissionDeniedError(),
   ServerpodClientNetworkException() ||
   SocketException() ||
   TimeoutException() ||

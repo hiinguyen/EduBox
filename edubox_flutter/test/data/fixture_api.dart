@@ -119,8 +119,21 @@ class FixtureEduBoxApi implements EduBoxApi {
 
   @override
   Stream<PingMessage> pingStream() async* {
-    _dial();
-    final profile = _profileOf(_caller());
+    calls++;
+    if (unreachable) {
+      // The real streaming client throws transport MethodStreamExceptions,
+      // not the unary ServerpodClientNetworkException.
+      throw const WebSocketConnectException('connection refused');
+    }
+    final key = _storedAccountKey;
+    if (key == null) {
+      // With requireLogin the server answers authenticationFailed before the
+      // endpoint guard, so the stream never reaches AccessDenied(unauthenticated).
+      throw OpenMethodStreamException(
+        OpenMethodStreamResponseType.authenticationFailed,
+      );
+    }
+    final profile = _profileOf(fixtures.account(key));
     if (profile.status != ProfileStatus.ready) {
       throw AccessDeniedException(reason: AccessDeniedReason.notSetUp);
     }
