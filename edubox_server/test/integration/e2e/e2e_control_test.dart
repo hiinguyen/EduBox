@@ -197,6 +197,50 @@ void main() {
       );
     });
 
+    test('authorize rejects other run modes even for a hand-built config '
+        'whose e2eControl is true', () {
+      // Built directly, so EduboxConfig.load's run-mode gate never ran: only
+      // the endpoint's own run-mode check stands between this config and the
+      // route.
+      final config = EduboxConfig(
+        storage: StorageConfig(
+          endpoint: Uri.parse('http://localhost:9000'),
+          publicEndpoint: Uri.parse('http://localhost:9000'),
+          bucket: 'edubox-test',
+          region: 'us-east-1',
+        ),
+        e2eControl: true,
+      );
+      for (final mode in ['production', 'staging', 'preview', '']) {
+        expect(
+          E2eEndpoint.enabledForRunMode(mode, config),
+          isFalse,
+          reason: mode,
+        );
+        expect(
+          E2eEndpoint.authorize(
+            runMode: mode,
+            config: config,
+            expectedToken: _testToken,
+            providedToken: _testToken,
+          ),
+          isFalse,
+          reason: mode,
+        );
+      }
+      // The same config is accepted in an allowed mode, so the denial above
+      // comes from the run mode alone.
+      expect(
+        E2eEndpoint.authorize(
+          runMode: 'test',
+          config: config,
+          expectedToken: _testToken,
+          providedToken: _testToken,
+        ),
+        isTrue,
+      );
+    });
+
     test('the committed development mode leaves the route off', () {
       final config = EduboxConfig.load(
         runMode: 'development',
