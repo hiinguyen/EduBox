@@ -25,6 +25,7 @@ dependencies:
   intl: any
   path: ^1.9.0
   path_provider: ^2.1.6
+  serverpod_auth_idp_client: 4.0.4
   serverpod_auth_idp_flutter: 4.0.4
   serverpod_flutter: 4.0.4
   sqlite3: ^3.8.0
