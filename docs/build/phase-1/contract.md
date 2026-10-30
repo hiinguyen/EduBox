@@ -633,8 +633,12 @@ slot: any widget or constructor argument named `Text` positional, `label`,
 slots in `test/l10n/literal_string_scanner.dart`. It visits both
 `InstanceCreationExpression` (`const Text(...)`) and `MethodInvocation`
 (`Text(...)`), and it unwraps parenthesized expressions, conditionals
-(`Text(isOn ? 'Bật' : 'Tắt')`), `??`, and `as` casts, so a literal nested in
-those forms is still reported. The scanner has a self-test that asserts the
+(`Text(isOn ? 'Bật' : 'Tắt')`), `??`, `+` concatenation
+(`Text('Chào ' + name)`), and `as` casts, so a literal nested in those forms is
+still reported. Two forms remain uncovered, and frontend code must not use
+them: a literal reached through a variable reference
+(`const x = '...'; Text(x)`) and a literal used as a method target
+(`Text('xin chào'.toUpperCase())`). The scanner has a self-test that asserts the
 exact violation list for every form and passes an l10n lookup, and
 `allowlistedLiterals` is the documented, empty default allowlist for non-copy
 values (keys and asset paths are not text slots; test-only code is outside

@@ -163,7 +163,8 @@ class _LiteralVisitor extends RecursiveAstVisitor<void> {
   }
 
   /// Unwraps expressions that can contain a hardcoded string: parentheses,
-  /// `condition ? 'a' : 'b'`, `'a' ?? 'b'`, and casts.
+  /// `condition ? 'a' : 'b'`, `'a' ?? 'b'`, `'a' + b` concatenation, and
+  /// casts.
   static Iterable<Expression> _literalOperands(Expression expression) sync* {
     if (expression is ParenthesizedExpression) {
       yield* _literalOperands(expression.expression);
@@ -171,7 +172,8 @@ class _LiteralVisitor extends RecursiveAstVisitor<void> {
       yield* _literalOperands(expression.thenExpression);
       yield* _literalOperands(expression.elseExpression);
     } else if (expression is BinaryExpression &&
-        expression.operator.type == TokenType.QUESTION_QUESTION) {
+        (expression.operator.type == TokenType.QUESTION_QUESTION ||
+            expression.operator.type == TokenType.PLUS)) {
       yield* _literalOperands(expression.leftOperand);
       yield* _literalOperands(expression.rightOperand);
     } else if (expression is AsExpression) {

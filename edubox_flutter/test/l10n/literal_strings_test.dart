@@ -34,7 +34,8 @@ void main() {
   });
 
   test(
-    'the scanner catches every widget-call form, including nested expressions',
+    'the scanner catches every widget-call form, including nested expressions '
+    'and + concatenation',
     () {
       const source = r'''
 import 'package:flutter/material.dart';
@@ -56,6 +57,8 @@ void plant(BuildContext context, bool isOn, String? name) {
   AppBar(title: Text('Trang'));
   TextSpan(text: 'Đoạn');
   SelectableText('Chọn');
+  Text('Chào ' + name!);
+  Text(name! + ' ơi' + '!');
   Text(AppLocalizations.of(context)!.retry);
 }
 ''';
@@ -85,6 +88,9 @@ void plant(BuildContext context, bool isOn, String? name) {
           'Text(...)',
           'TextSpan.text',
           'SelectableText(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
         ],
       );
       expect(
@@ -109,6 +115,9 @@ void plant(BuildContext context, bool isOn, String? name) {
           '17:22',
           '18:18',
           '19:18',
+          '20:8',
+          '21:16',
+          '21:24',
         ],
       );
     },

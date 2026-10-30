@@ -1,0 +1,292 @@
+import 'package:edubox_client/edubox_client.dart';
+import 'package:edubox_fixtures/edubox_fixtures.dart';
+import 'package:edubox_flutter/src/contract/backend_result.dart';
+import 'package:edubox_flutter/src/contract/network_controller.dart';
+import 'package:edubox_flutter/src/contract/session.dart';
+import 'package:edubox_flutter/src/data/cached_backend.dart';
+import 'package:edubox_flutter/src/local/local_store.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'fixture_api.dart';
+
+void main() {
+  late ManualNetworkController network;
+  late FixtureEduBoxApi api;
+  late CachedDataStore store;
+  late CachedBackend backend;
+
+  setUp(() {
+    network = ManualNetworkController();
+    api = FixtureEduBoxApi();
+    store = CachedDataStore(EduBoxDatabase.inMemory());
+    backend = CachedBackend(api: api, store: store, network: network);
+  });
+
+  tearDown(() async {
+    await backend.dispose();
+    network.dispose();
+  });
+
+  Future<void> signIn(String key) async {
+    final account = FixtureSet.phase1().account(key);
+    final result = await backend.auth.signIn(
+      email: account.email,
+      password: devPassword,
+    );
+    expect(result.isOk, isTrue, reason: '$result');
+  }
+
+  test('offline sign-in and check-again fail fast without dialing', () async {
+    network.goOffline();
+    final signIn = await backend.auth.signIn(
+      email: 'hs.an@edubox.test',
+      password: devPassword,
+    );
+    expect(signIn.errorOrNull, isA<BackendUnreachableError>());
+    final refresh = await backend.auth.refreshProfile();
+    expect(refresh.errorOrNull, isA<BackendUnreachableError>());
+    expect(api.calls, 0);
+  });
+
+  test('offline data reads never dial the server', () async {
+    await signIn(FixtureKeys.studentAn);
+    await backend.library.library();
+    final before = api.calls;
+    network.goOffline();
+    final cached = await backend.library.library();
+    expect(cached.isStale, isTrue);
+    await backend.profile.me();
+    network.goReconnecting();
+    await backend.library.library();
+    expect(api.calls, before);
+  });
+
+  test(
+    'sign-in trims and lower-cases the email and caches the session',
+    () async {
+      final result = await backend.auth.signIn(
+        email: '  HS.An@EduBox.test ',
+        password: devPassword,
+      );
+      expect(result.isOk, isTrue);
+      expect(result.valueOrNull!.signedInEmail, 'hs.an@edubox.test');
+      final cached = await store.readSession();
+      expect(cached!.value.role, UserRole.student);
+    },
+  );
+
+  test(
+    'the reconnect transition refreshes the profile and the role home',
+    () async {
+      await signIn(FixtureKeys.teacherLan);
+      expect((await backend.classes.mine()).valueOrNull, hasLength(3));
+      network.goOffline();
+      api.fixtures = api.fixtures.withReconnectDeltas();
+      expect((await store.readTeacherClasses())!.value, hasLength(3));
+      network.goOnline();
+      await Future<void>.delayed(Duration.zero);
+      await backend.reconnectRefresh;
+      final cached = await store.readTeacherClasses();
+      expect(cached!.value.map((c) => c.name), contains('8B'));
+    },
+  );
+
+  test('a failing reconnect refresh is contained', () async {
+    // Close the shared store first so only one EduBoxDatabase is open at a
+    // time (drift warns, and a real double-open is what that guard catches).
+    await store.close();
+    final brokenStore = _ThrowingReadStore(EduBoxDatabase.inMemory());
+    final brokenBackend = CachedBackend(
+      api: FixtureEduBoxApi(),
+      store: brokenStore,
+      network: network,
+    );
+    addTearDown(brokenBackend.dispose);
+    network.goOffline();
+    network.goOnline();
+    await Future<void>.delayed(Duration.zero);
+    await expectLater(brokenBackend.reconnectRefresh, completes);
+  });
+
+  test(
+    'restore with no stored auth clears the cache and returns null',
+    () async {
+      await signIn(FixtureKeys.studentAn);
+      await api.clearStoredAuth();
+      final restored = await backend.auth.restoreSession();
+      expect(restored.isOk, isTrue);
+      expect(restored.valueOrNull, isNull);
+      expect(await store.readSession(), isNull);
+    },
+  );
+
+  test('restore online re-reads the role from the server', () async {
+    await signIn(FixtureKeys.nullRole);
+    api.setRole(FixtureKeys.nullRole, 'teacher');
+    final restored = await backend.auth.restoreSession();
+    expect(restored.valueOrNull!.role, UserRole.teacher);
+    expect(restored.isStale, isFalse);
+  });
+
+  test('restore offline returns the cached session as stale', () async {
+    await signIn(FixtureKeys.parentBinh);
+    network.goOffline();
+    final restored = await backend.auth.restoreSession();
+    expect(restored.isStale, isTrue);
+    expect(restored.valueOrNull!.role, UserRole.parent);
+    expect(restored.valueOrNull!.linkedStudentName, 'Nguyễn Minh An');
+  });
+
+  test(
+    'restore on an online but unreachable server falls back to the cache',
+    () async {
+      await signIn(FixtureKeys.teacherLan);
+      api.unreachable = true;
+      final restored = await backend.auth.restoreSession();
+      expect(restored.isOk, isTrue);
+      expect(restored.isStale, isTrue);
+      expect(restored.valueOrNull!.role, UserRole.teacher);
+    },
+  );
+
+  test('sign-out offline clears the stored auth and the cache', () async {
+    await signIn(FixtureKeys.studentAn);
+    await backend.library.library();
+    network.goOffline();
+    final result = await backend.auth.signOut();
+    expect(result.isOk, isTrue);
+    expect(await store.readSession(), isNull);
+    expect(await store.readStudentLibrary(), isNull);
+    expect(await api.restoreStoredAuth(), isFalse);
+  });
+
+  test('sign-out online survives a server failure', () async {
+    await signIn(FixtureKeys.studentAn);
+    await backend.library.library();
+    api.unreachable = true;
+    final result = await backend.auth.signOut();
+    expect(result.isOk, isTrue);
+    expect(await store.readSession(), isNull);
+    expect(await store.readStudentLibrary(), isNull);
+    expect(await api.restoreStoredAuth(), isFalse);
+  });
+
+  test('sign-out reports a local clear failure instead of throwing', () async {
+    await store.close();
+    final failingApi = _ClearAuthFailsApi();
+    final failingStore = CachedDataStore(EduBoxDatabase.inMemory());
+    final failingBackend = CachedBackend(
+      api: failingApi,
+      store: failingStore,
+      network: ManualNetworkController(),
+    );
+    addTearDown(failingBackend.dispose);
+    final signInResult = await failingBackend.auth.signIn(
+      email: FixtureSet.phase1().account(FixtureKeys.studentAn).email,
+      password: devPassword,
+    );
+    expect(signInResult.isOk, isTrue);
+    expect((await failingBackend.library.library()).isOk, isTrue);
+    expect(await failingStore.readSession(), isNotNull);
+    expect(await failingStore.readStudentLibrary(), isNotNull);
+    failingApi.unreachable = true;
+    final result = await failingBackend.auth.signOut();
+    expect(result.errorOrNull, isA<UnexpectedBackendError>());
+    expect(await failingStore.readSession(), isNull);
+    expect(await failingStore.readStudentLibrary(), isNull);
+  });
+
+  test('a sign-in failure after login clears the stored auth', () async {
+    await store.close();
+    final failingApi = _ProfileFailsApi();
+    final failingStore = CachedDataStore(EduBoxDatabase.inMemory());
+    final failingBackend = CachedBackend(
+      api: failingApi,
+      store: failingStore,
+      network: ManualNetworkController(),
+    );
+    addTearDown(failingBackend.dispose);
+    final result = await failingBackend.auth.signIn(
+      email: FixtureSet.phase1().account(FixtureKeys.studentAn).email,
+      password: devPassword,
+    );
+    expect(result.errorOrNull, isA<BackendUnreachableError>());
+    expect(await failingApi.restoreStoredAuth(), isFalse);
+  });
+
+  test('offline role gate uses the cached session', () async {
+    await signIn(FixtureKeys.studentAn);
+    await backend.library.library();
+    network.goOffline();
+    expect(
+      (await backend.classes.mine()).errorOrNull,
+      isA<PermissionDeniedError>(),
+    );
+  });
+
+  test(
+    'ping offline throws BackendUnreachable inside BackendException',
+    () async {
+      await signIn(FixtureKeys.studentAn);
+      network.goOffline();
+      await expectLater(
+        backend.diagnostics.pingStream().toList(),
+        throwsA(
+          isA<BackendException>().having(
+            (e) => e.error,
+            'error',
+            isA<BackendUnreachableError>(),
+          ),
+        ),
+      );
+    },
+  );
+
+  test('ping without a session is SessionExpired', () async {
+    await expectLater(
+      backend.diagnostics.pingStream().toList(),
+      throwsA(
+        isA<BackendException>().having(
+          (e) => e.error,
+          'error',
+          isA<SessionExpiredError>(),
+        ),
+      ),
+    );
+  });
+
+  test('ping on a closed port is BackendUnreachable', () async {
+    await signIn(FixtureKeys.studentAn);
+    api.unreachable = true;
+    await expectLater(
+      backend.diagnostics.pingStream().toList(),
+      throwsA(
+        isA<BackendException>().having(
+          (e) => e.error,
+          'error',
+          isA<BackendUnreachableError>(),
+        ),
+      ),
+    );
+  });
+}
+
+class _ProfileFailsApi extends FixtureEduBoxApi {
+  @override
+  Future<ProfileResult> profileMe() async =>
+      throw const ServerpodClientNetworkException('profile timed out');
+}
+
+class _ClearAuthFailsApi extends FixtureEduBoxApi {
+  @override
+  Future<void> clearStoredAuth() async =>
+      throw StateError('secure storage unavailable');
+}
+
+class _ThrowingReadStore extends CachedDataStore {
+  _ThrowingReadStore(super.db);
+
+  @override
+  Future<CachedValue<AuthSession>?> readSession() async =>
+      throw StateError('drift read failed');
+}

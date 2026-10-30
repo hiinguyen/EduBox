@@ -11,6 +11,7 @@ environment:
 resolution: workspace
 
 dependencies:
+  connectivity_plus: ^7.3.2
   drift: '>=2.34.0 <2.35.0'
   edubox_client:
     path: ../edubox_client
@@ -20,9 +21,11 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  http: ^1.6.0
   intl: any
   path: ^1.9.0
   path_provider: ^2.1.6
+  serverpod_auth_idp_client: 4.0.4
   serverpod_auth_idp_flutter: 4.0.4
   serverpod_flutter: 4.0.4
   sqlite3: ^3.8.0
@@ -46,3 +49,24 @@ dependency_overrides:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - assets/fonts/licenses/
+  fonts:
+    - family: Bitter
+      fonts:
+        - asset: assets/fonts/Bitter-SemiBold.ttf
+          weight: 600
+    - family: BeVietnamPro
+      fonts:
+        - asset: assets/fonts/BeVietnamPro-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/BeVietnamPro-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/BeVietnamPro-SemiBold.ttf
+          weight: 600
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
