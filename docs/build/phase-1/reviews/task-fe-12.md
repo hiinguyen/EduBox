@@ -52,3 +52,13 @@ FINDINGS:
 - [HIGH] edubox_flutter/integration_test/phase1_test.dart:186 - test 7 now fails the run when it misses `networkReconnecting`, but it only samples every 100ms of real time, and the strip shows only while the reloads run (`ConnectivityState.strip` is `reconnecting` only while `_running > 0`, with no minimum display time). Against the local compose stack, profile.me plus library can finish inside the first 100ms delay, so the test fails on a correct app. This is the plan-review flake again with the opposite sign, and it puts the gate's three consecutive clean runs at risk - evidence: lib/src/app/connectivity_state.dart strip getter and _reloadAll; the loop's first check comes after `pump(100ms)` - owner: FE implementer. Fix: before goOnline, get `ConnectivityState` from AppScope and add a listener that records `strip` on every notify (the `reconnecting` notify runs synchronously inside goOnline -> _onNetwork -> _reloadAll); after the new data shows, assert the recorded sequence includes reconnecting and ends hidden. Keep the frame check only as a non-failing extra, if at all.
 - [LOW] edubox_flutter/lib/src/shell/role_shell.dart:288 - carried: the InkWell overlay is wider than the pill (acceptable to carry) - owner: FE implementer
 - [LOW] docs/design/app-direction.md:331 - carried: still names `NavigationRail(extended: true)` (acceptable to carry, record before the gate) - owner: design doc owner
+
+## Re-review r3 (orchestrator, scoped)
+
+VERDICT: APPROVE
+
+FINDINGS:
+- none
+
+`c7ad46d..01e72c2`: E2E test 7 attaches a listener to `ConnectivityState` before `goOnline`, records every `StripState`, removes it in `addTearDown`, waits boundedly for the reconnect delta, then asserts `containsAllInOrder([offline, reconnecting, hidden])` plus the final online UI; the 100ms poll is gone, so a reload that finishes before the first frame can no longer fail a correct app.
+Implementer evidence: flutter analyze clean (covers integration_test), format clean, flutter test 266 passed.
