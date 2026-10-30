@@ -229,15 +229,7 @@ void main() {
       for (final destination in rail.destinations)
         (destination.label as Text).data,
     ];
-    final built = <String>[
-      vi.navHome,
-      if (find
-          .byKey(const Key('screen.studentLibrary'), skipOffstage: false)
-          .evaluate()
-          .isNotEmpty)
-        vi.navLibrary,
-    ];
-    expect(labels, built);
+    expect(labels, [vi.navHome, vi.navLibrary]);
     semantics.dispose();
   });
 

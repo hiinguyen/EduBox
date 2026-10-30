@@ -223,6 +223,7 @@ class _SubjectGroupView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final window = WindowClass.of(MediaQuery.sizeOf(context).width);
     final heading = group.subject ?? l10n.librarySubjectOther;
     final items = group.items;
     final split = (items.length / 2).ceil();
@@ -238,8 +239,8 @@ class _SubjectGroupView extends StatelessWidget {
         ),
         const SizedBox(height: EduSpace.s12),
         EduPanel(
-          padding: const EdgeInsets.symmetric(
-            horizontal: EduSpace.s24,
+          padding: EdgeInsets.symmetric(
+            horizontal: window.isCompact ? EduSpace.s16 : EduSpace.s24,
             vertical: EduSpace.s8,
           ),
           child: lists.length == 1
@@ -290,7 +291,12 @@ class _SkeletonPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final window = WindowClass.of(MediaQuery.sizeOf(context).width);
     return EduPanel(
+      padding: EdgeInsets.symmetric(
+        horizontal: window.isCompact ? EduSpace.s16 : EduSpace.s24,
+        vertical: EduSpace.s24,
+      ),
       child: Column(
         children: [
           for (var row = 0; row < 3; row++)

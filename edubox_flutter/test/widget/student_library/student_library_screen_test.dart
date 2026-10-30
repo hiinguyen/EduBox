@@ -1,7 +1,9 @@
 import 'package:edubox_fixtures/edubox_fixtures.dart';
 import 'package:edubox_flutter/src/contract/backend_result.dart';
+import 'package:edubox_flutter/src/features/library/content_row.dart';
 import 'package:edubox_flutter/src/screens/student_home/student_home_screen.dart';
 import 'package:edubox_flutter/src/screens/student_library/student_library_screen.dart';
+import 'package:edubox_flutter/src/shell/block_states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -141,6 +143,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(vi.libraryLoadErrorWithTime('09:14')), findsOneWidget);
     expect(find.text('Phân số và số thập phân'), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.clearFailures();
+    await tester.tap(find.text(vi.retry));
+    await tester.pumpAndSettle();
+    expect(find.text(vi.libraryLoadErrorWithTime('09:14')), findsNothing);
+    expect(find.text(vi.libraryTotal(6)), findsOneWidget);
   });
 
   testWidgets('Mở thư viện on the home selects this destination', (
@@ -160,9 +168,62 @@ void main() {
     expect(find.byKey(StudentLibraryKeys.header), findsOneWidget);
   });
 
+  testWidgets('tablet: two columns split column-major at ceil(n/2)', (
+    tester,
+  ) async {
+    final app = await openLibrary(tester);
+    app.fake.applyReconnectDeltas();
+    app.network.goOffline();
+    await tester.pumpAndSettle();
+    app.network.goOnline();
+    await tester.pumpAndSettle();
+    expect(find.text(vi.libraryTotal(7)), findsOneWidget);
+
+    Offset at(String title) => tester.getTopLeft(find.text(title).first);
+    final luyenTap = at('Luyện tập: Phép cộng phân số');
+    final onTap = at('Ôn tập chương 1');
+    final phanSo = at('Phân số và số thập phân');
+    // Split at ceil(3 / 2) = 2: two rows down the first column, then the
+    // third at the top of the second column.
+    expect(luyenTap.dx, onTap.dx);
+    expect(onTap.dy, greaterThan(luyenTap.dy));
+    expect(phanSo.dx, greaterThan(luyenTap.dx));
+    expect(phanSo.dy, luyenTap.dy);
+    await expectAccessibilityGuidelines(tester);
+  });
+
+  testWidgets('panel padding: 16 on compact, 24 on tablet', (tester) async {
+    Future<double> rowInset(Size size) async {
+      await openLibrary(tester, size: size);
+      final row = find.ancestor(
+        of: find.text('Luyện tập: Phép cộng phân số'),
+        matching: find.byType(ContentRow),
+      );
+      final panel = find.ancestor(
+        of: row,
+        matching: find.byType(EduPanel),
+      );
+      expect(row, findsOneWidget);
+      expect(panel, findsOneWidget);
+      return tester.getTopLeft(row).dx - tester.getTopLeft(panel).dx;
+    }
+
+    expect(await rowInset(TestSizes.phone), 16);
+    expect(await rowInset(TestSizes.tablet), 24);
+  });
+
   testWidgets('200% text: one column, no overflow', (tester) async {
-    await openLibrary(tester, size: TestSizes.phone, textScale: 2);
+    await openLibrary(tester, size: TestSizes.tablet, textScale: 2);
     expect(tester.takeException(), isNull);
+    final first = tester.getTopLeft(
+      find.text('Luyện tập: Phép cộng phân số').first,
+    );
+    final second = tester.getTopLeft(
+      find.text('Phân số và số thập phân').first,
+    );
+    expect(first.dx, second.dx);
+    expect(second.dy, greaterThan(first.dy));
+    await expectAccessibilityGuidelines(tester);
   });
 
   for (final (name, size) in [
