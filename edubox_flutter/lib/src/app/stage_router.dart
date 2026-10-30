@@ -2,6 +2,7 @@ import 'package:edubox_client/edubox_client.dart' show UserRole;
 import 'package:flutter/material.dart';
 
 import '../screens/app_start/app_start_screens.dart';
+import '../screens/sign_in/sign_in_screen.dart';
 import 'session_controller.dart';
 
 /// Maps the session stage (and, at home, the role) to the one screen that
@@ -18,7 +19,7 @@ class StageRouter extends StatelessWidget {
     return switch (session.stage) {
       AppStage.opening => const AppOpeningScreen(),
       AppStage.startFailed => AppStartFailedScreen(onRetry: session.start),
-      AppStage.signedOut => const AppOpeningScreen(),
+      AppStage.signedOut => const SignInScreen(),
       AppStage.notSetUp => const AppOpeningScreen(),
       AppStage.home => switch (session.session!.role!) {
         UserRole.student => const AppOpeningScreen(),
