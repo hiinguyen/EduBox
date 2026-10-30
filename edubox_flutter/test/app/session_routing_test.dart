@@ -5,8 +5,11 @@ import 'package:edubox_flutter/src/app/app_scope.dart';
 import 'package:edubox_flutter/src/app/connectivity_state.dart';
 import 'package:edubox_flutter/src/app/loadable.dart';
 import 'package:edubox_flutter/src/app/session_controller.dart';
+import 'package:edubox_flutter/src/contract/backend.dart';
 import 'package:edubox_flutter/src/contract/backend_result.dart';
 import 'package:edubox_flutter/src/contract/network_controller.dart';
+import 'package:edubox_flutter/src/contract/repositories.dart';
+import 'package:edubox_flutter/src/contract/session.dart';
 import 'package:edubox_flutter/src/fake/fake_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -179,6 +182,43 @@ void main() {
       expect(session.stage, AppStage.signedOut);
       expect(fake.currentSession, isNull);
     });
+
+    test(
+      'a signOut during a reconnect refresh is not overwritten by it',
+      () async {
+        final localNetwork = ManualNetworkController();
+        final gated = _GatedRefreshBackend(
+          FakeBackend(network: localNetwork),
+        );
+        final localConnectivity = ConnectivityState(localNetwork);
+        final controller = SessionController(
+          gated,
+          connectivity: localConnectivity,
+        );
+        addTearDown(() {
+          controller.dispose();
+          localConnectivity.dispose();
+          localNetwork.dispose();
+        });
+
+        gated.fake.signInAs(FixtureKeys.studentAn);
+        localNetwork.goOffline();
+        await controller.start();
+        expect(controller.stage, AppStage.home);
+
+        gated.holdRefresh();
+        localNetwork.goOnline();
+        await gated.refreshStarted.future;
+
+        expect(await controller.signOut(), isNull);
+        expect(controller.stage, AppStage.signedOut);
+
+        gated.releaseRefresh();
+        await pumpEventQueue();
+        expect(controller.stage, AppStage.signedOut);
+        expect(controller.session, isNull);
+      },
+    );
   });
 
   group('ConnectivityState', () {
@@ -311,4 +351,74 @@ void main() {
       expect(find.byKey(const Key('screen.signIn')), findsOneWidget);
     });
   });
+}
+
+/// A backend whose reconnect `refreshProfile` computes its result at once
+/// but stays pending until [releaseRefresh], so a test can complete a
+/// sign-out while the refresh is in flight.
+class _GatedRefreshBackend implements EduBoxBackend {
+  _GatedRefreshBackend(this.fake);
+
+  final FakeBackend fake;
+  final refreshStarted = Completer<void>();
+  Completer<void>? _gate;
+
+  void holdRefresh() => _gate = Completer<void>();
+
+  void releaseRefresh() {
+    final gate = _gate;
+    _gate = null;
+    if (gate != null && !gate.isCompleted) gate.complete();
+  }
+
+  @override
+  AuthRepository get auth => _GatedRefreshAuth(this);
+
+  @override
+  ProfileRepository get profile => fake.profile;
+
+  @override
+  ClassesRepository get classes => fake.classes;
+
+  @override
+  LibraryRepository get library => fake.library;
+
+  @override
+  ParentRepository get parent => fake.parent;
+
+  @override
+  DiagnosticsRepository get diagnostics => fake.diagnostics;
+
+  @override
+  Future<void> dispose() => fake.dispose();
+}
+
+class _GatedRefreshAuth implements AuthRepository {
+  _GatedRefreshAuth(this.backend);
+
+  final _GatedRefreshBackend backend;
+
+  @override
+  Future<BackendResult<AuthSession>> refreshProfile() async {
+    final result = await backend.fake.auth.refreshProfile();
+    if (!backend.refreshStarted.isCompleted) {
+      backend.refreshStarted.complete();
+    }
+    final gate = backend._gate;
+    if (gate != null) await gate.future;
+    return result;
+  }
+
+  @override
+  Future<BackendResult<AuthSession>> signIn({
+    required String email,
+    required String password,
+  }) => backend.fake.auth.signIn(email: email, password: password);
+
+  @override
+  Future<BackendResult<AuthSession?>> restoreSession() =>
+      backend.fake.auth.restoreSession();
+
+  @override
+  Future<BackendResult<void>> signOut() => backend.fake.auth.signOut();
 }

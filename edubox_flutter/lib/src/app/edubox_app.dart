@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 
@@ -38,7 +39,7 @@ class _EduBoxBootstrapState extends State<EduBoxBootstrap> {
     try {
       final services = await widget.createServices();
       if (!mounted || generation != _generation) {
-        unawaited(services.backend.dispose());
+        unawaited(services.dispose());
         return;
       }
       setState(() {
@@ -47,7 +48,12 @@ class _EduBoxBootstrapState extends State<EduBoxBootstrap> {
       });
     } catch (error, stackTrace) {
       if (!mounted || generation != _generation) return;
-      debugPrint('EduBox startup failed: $error\n$stackTrace');
+      developer.log(
+        'EduBox startup failed',
+        name: 'EduBox.Bootstrap',
+        error: error,
+        stackTrace: stackTrace,
+      );
       setState(() => _failed = true);
     }
   }
@@ -62,7 +68,7 @@ class _EduBoxBootstrapState extends State<EduBoxBootstrap> {
     // A load that lands after disposal must not hold resources.
     _generation++;
     final services = _services;
-    if (services != null) unawaited(services.backend.dispose());
+    if (services != null) unawaited(services.dispose());
     super.dispose();
   }
 

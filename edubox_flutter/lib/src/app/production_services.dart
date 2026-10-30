@@ -28,16 +28,25 @@ Future<AppServices> createProductionServices(
   File? databaseFile,
 }) async {
   final file = databaseFile ?? await defaultDatabaseFile();
-  final seam = network ?? await _startProbedNetwork(config);
+  final ownedNetwork = network == null
+      ? await _startProbedNetwork(config)
+      : null;
+  final seam = network ?? ownedNetwork!;
   final backend = CachedBackend(
     api: ClientEduBoxApi.create(config),
     store: CachedDataStore(EduBoxDatabase.open(file)),
     network: seam,
   );
-  return AppServices(backend: backend, network: seam);
+  return AppServices(
+    backend: backend,
+    network: seam,
+    disposeNetwork: ownedNetwork?.dispose,
+  );
 }
 
-Future<NetworkController> _startProbedNetwork(BackendConfig config) async {
+Future<ProbedNetworkController> _startProbedNetwork(
+  BackendConfig config,
+) async {
   final controller = ProbedNetworkController(
     connectivity: ConnectivityPlusSource(),
     probe: HttpReachabilityProbe(config),

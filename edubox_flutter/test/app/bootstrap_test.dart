@@ -62,4 +62,64 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(SignInKeys.screen), findsOneWidget);
   });
+
+  testWidgets('bootstrap disposes its services, including the network seam', (
+    tester,
+  ) async {
+    setWindow(tester, TestSizes.tablet);
+    final holder = ManualNetworkControllerHolder.create();
+    final closed = Completer<void>();
+    holder.network.changes.listen(null, onDone: closed.complete);
+    final gate = Completer<AppServices>();
+    await tester.pumpWidget(
+      EduBoxBootstrap(createServices: () => gate.future),
+    );
+    gate.complete(
+      AppServices(
+        backend: holder.fake,
+        network: holder.network,
+        clock: fixedClock,
+        disposeNetwork: holder.network.dispose,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(SignInKeys.screen), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await settleDisposal(tester, closed);
+    expect(closed.isCompleted, isTrue);
+  });
+
+  testWidgets('a late services load is disposed when the bootstrap is gone', (
+    tester,
+  ) async {
+    setWindow(tester, TestSizes.tablet);
+    final holder = ManualNetworkControllerHolder.create();
+    final closed = Completer<void>();
+    holder.network.changes.listen(null, onDone: closed.complete);
+    final gate = Completer<AppServices>();
+    await tester.pumpWidget(
+      EduBoxBootstrap(createServices: () => gate.future),
+    );
+    await tester.pumpWidget(const SizedBox());
+
+    gate.complete(
+      AppServices(
+        backend: holder.fake,
+        network: holder.network,
+        clock: fixedClock,
+        disposeNetwork: holder.network.dispose,
+      ),
+    );
+    await settleDisposal(tester, closed);
+    expect(closed.isCompleted, isTrue);
+  });
+}
+
+/// Pumps until [done] completes; widget tests run under fake async, where
+/// `pumpEventQueue` alone would never advance.
+Future<void> settleDisposal(WidgetTester tester, Completer<void> done) async {
+  for (var i = 0; i < 10 && !done.isCompleted; i++) {
+    await tester.pump();
+  }
 }

@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 
 import '../contract/backend.dart';
@@ -40,6 +42,11 @@ class SessionController extends ChangeNotifier {
   bool _isStale = false;
   bool _disposed = false;
 
+  /// Bumped whenever the session is replaced or cleared. A reconnect
+  /// refresh captures it before its await so a sign-out or expiry that
+  /// completes while it is in flight is not overwritten.
+  int _sessionEpoch = 0;
+
   AppStage get stage => _stage;
 
   AuthSession? get session => _session;
@@ -76,6 +83,7 @@ class SessionController extends ChangeNotifier {
     bool isStale = false,
   }) {
     if (_disposed) return;
+    _sessionEpoch++;
     _session = session;
     _sessionRefreshedAt = refreshedAt;
     _isStale = isStale;
@@ -88,18 +96,26 @@ class SessionController extends ChangeNotifier {
   /// this is the authoritative read that follows it.
   Future<void> _refreshAfterReconnect() async {
     if (_disposed || _session == null || !_isStale) return;
+    final epoch = _sessionEpoch;
     final result = await backend.auth.refreshProfile();
     if (_disposed) return;
+    // A sign-out, expiry or newer accept that completed while the refresh
+    // was in flight wins: never resurrect the session it started with.
+    if (epoch != _sessionEpoch) return;
     switch (result) {
       case BackendOk(:final value, :final cachedAt):
         accept(value, refreshedAt: cachedAt);
       case BackendFailure(error: SessionExpiredError()):
         _clearSession();
         _go(AppStage.signedOut);
-      case BackendFailure():
+      case BackendFailure(:final error):
         // Transient: keep rendering the cached role home; the next reconnect
-        // tries again.
-        break;
+        // tries again. Log it so the failure is not silently dropped.
+        developer.log(
+          'Reconnect profile refresh failed',
+          name: 'EduBox.SessionController',
+          error: error,
+        );
     }
   }
 
@@ -108,7 +124,11 @@ class SessionController extends ChangeNotifier {
     final result = await backend.auth.signOut();
     if (_disposed) return;
     if (result case BackendFailure(:final error)) {
-      debugPrint('EduBox session expire: local sign-out failed: $error');
+      developer.log(
+        'Local sign-out after an expired session failed',
+        name: 'EduBox.SessionController',
+        error: error,
+      );
     }
     _clearSession();
     _go(AppStage.signedOut);
@@ -126,6 +146,7 @@ class SessionController extends ChangeNotifier {
   }
 
   void _clearSession() {
+    _sessionEpoch++;
     _session = null;
     _sessionRefreshedAt = null;
     _isStale = false;
