@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../screens/account_not_set_up/account_not_set_up_screen.dart';
 import '../screens/app_start/app_start_screens.dart';
 import '../screens/sign_in/sign_in_screen.dart';
+import '../shell/student_shell.dart';
 import 'session_controller.dart';
 
 /// Maps the session stage (and, at home, the role) to the one screen that
@@ -23,7 +24,7 @@ class StageRouter extends StatelessWidget {
       AppStage.signedOut => const SignInScreen(),
       AppStage.notSetUp => const AccountNotSetUpScreen(),
       AppStage.home => switch (session.session!.role!) {
-        UserRole.student => const AppOpeningScreen(),
+        UserRole.student => const StudentShell(),
         UserRole.teacher => const AppOpeningScreen(),
         UserRole.parent => const AppOpeningScreen(),
       },
