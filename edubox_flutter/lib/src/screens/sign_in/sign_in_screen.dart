@@ -101,6 +101,25 @@ class _SignInScreenState extends State<SignInScreen>
     return _password.text.isEmpty ? l10n.passwordRequired : null;
   }
 
+  /// A field decoration whose error is the brief's 18dp `error_outline`
+  /// glyph plus the sentence. The sentence is also passed to the field's
+  /// semantics as a hint by [build]; wrong credentials use an empty error
+  /// widget for the 2dp border only, with no per-field text.
+  InputDecoration _fieldDecoration({
+    required String? error,
+    required bool wrong,
+    Widget? suffixIcon,
+  }) {
+    final message = wrong ? null : error;
+    return InputDecoration(
+      constraints: const BoxConstraints(minHeight: EduSize.primaryButton),
+      error: wrong
+          ? const SizedBox.shrink()
+          : (message == null ? null : _FieldError(message)),
+      suffixIcon: suffixIcon,
+    );
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
     final l10n = AppLocalizations.of(context);
@@ -206,6 +225,8 @@ class _SignInScreenState extends State<SignInScreen>
     final l10n = AppLocalizations.of(context);
     final text = Theme.of(context).textTheme;
     final wrong = _status == _Status.wrongCredentials;
+    final emailError = _emailError(l10n);
+    final passwordError = _passwordError(l10n);
     return AuthPanelScaffold(
       key: SignInKeys.screen,
       child: AutofillGroup(
@@ -227,6 +248,7 @@ class _SignInScreenState extends State<SignInScreen>
             const SizedBox(height: EduSpace.s8),
             Semantics(
               label: l10n.emailLabel,
+              hint: wrong ? null : emailError,
               child: TextField(
                 key: SignInKeys.email,
                 controller: _email,
@@ -239,12 +261,9 @@ class _SignInScreenState extends State<SignInScreen>
                 autofillHints: const [AutofillHints.email],
                 style: text.bodyLarge,
                 onSubmitted: (_) => _passwordFocus.requestFocus(),
-                decoration: InputDecoration(
-                  constraints: const BoxConstraints(
-                    minHeight: EduSize.primaryButton,
-                  ),
-                  errorText: wrong ? null : _emailError(l10n),
-                  error: wrong ? const SizedBox.shrink() : null,
+                decoration: _fieldDecoration(
+                  error: emailError,
+                  wrong: wrong,
                 ),
               ),
             ),
@@ -253,6 +272,7 @@ class _SignInScreenState extends State<SignInScreen>
             const SizedBox(height: EduSpace.s8),
             Semantics(
               label: l10n.passwordLabel,
+              hint: wrong ? null : passwordError,
               child: TextField(
                 key: SignInKeys.password,
                 controller: _password,
@@ -265,12 +285,9 @@ class _SignInScreenState extends State<SignInScreen>
                 autofillHints: const [AutofillHints.password],
                 style: text.bodyLarge,
                 onSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  constraints: const BoxConstraints(
-                    minHeight: EduSize.primaryButton,
-                  ),
-                  errorText: wrong ? null : _passwordError(l10n),
-                  error: wrong ? const SizedBox.shrink() : null,
+                decoration: _fieldDecoration(
+                  error: passwordError,
+                  wrong: wrong,
                   suffixIcon: IconButton(
                     key: SignInKeys.togglePassword,
                     tooltip: _obscure ? l10n.showPassword : l10n.hidePassword,
@@ -362,61 +379,57 @@ class _StatusSlot extends StatelessWidget {
     return Padding(
       key: SignInKeys.status,
       padding: const EdgeInsets.only(top: EduSpace.s16),
-      child: Semantics(
-        liveRegion: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: ExcludeSemantics(
-                    child: Icon(
-                      unreachable
-                          ? Icons.cloud_off_outlined
-                          : Icons.error_outline,
-                      size: EduSize.statusGlyph,
-                      color: unreachable ? palette.muted : palette.negative,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: EduSpace.s8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        message,
-                        style: text.bodyLarge!.copyWith(
-                          color: unreachable ? palette.ink : palette.negative,
-                        ),
-                      ),
-                      if (unreachable)
-                        Text(
-                          l10n.backendUnreachableHint,
-                          style: text.bodyMedium!.copyWith(
-                            color: palette.muted,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (retryable)
-              Padding(
-                padding: const EdgeInsets.only(top: EduSpace.s8),
-                child: TextButton(
-                  key: SignInKeys.retry,
-                  onPressed: onRetry,
-                  child: Text(l10n.retry),
-                ),
-              ),
-          ],
+      child: BlockMessage(
+        message: message,
+        hint: unreachable ? l10n.backendUnreachableHint : null,
+        tone: unreachable ? BlockTone.offline : BlockTone.error,
+        messageStyle: text.bodyLarge!.copyWith(
+          color: unreachable ? palette.ink : palette.negative,
         ),
+        action: retryable
+            ? RetryButton(
+                buttonKey: SignInKeys.retry,
+                onPressed: onRetry,
+              )
+            : null,
       ),
+    );
+  }
+}
+
+/// A field-level error: the 18dp `error_outline` glyph then the sentence at
+/// 14/20 in the negative family (sign-in brief section 5).
+class _FieldError extends StatelessWidget {
+  const _FieldError(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = EduPalette.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: ExcludeSemantics(
+            child: Icon(
+              Icons.error_outline,
+              size: EduSize.statusGlyph,
+              color: palette.negative,
+            ),
+          ),
+        ),
+        const SizedBox(width: EduSpace.s8),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium!.copyWith(color: palette.negative),
+          ),
+        ),
+      ],
     );
   }
 }
