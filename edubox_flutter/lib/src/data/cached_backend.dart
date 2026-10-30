@@ -244,17 +244,20 @@ class _Auth implements AuthRepository {
         // Best effort: the local session is cleared below regardless.
       }
     }
+    BackendError? failure;
     try {
       await b.api.clearStoredAuth();
     } catch (error) {
-      return BackendFailure(mapApiError(error));
+      failure = mapApiError(error);
     }
+    // Clear the local cache even when secure storage refused to clear, or the
+    // next offline start would still restore the cached session and role home.
     try {
       await b.store.clearAll();
-      return const BackendOk(null);
     } catch (error) {
-      return BackendFailure(UnexpectedBackendError(error));
+      failure ??= UnexpectedBackendError(error);
     }
+    return failure == null ? const BackendOk(null) : BackendFailure(failure);
   }
 }
 

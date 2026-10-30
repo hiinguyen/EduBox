@@ -182,9 +182,14 @@ void main() {
       password: devPassword,
     );
     expect(signInResult.isOk, isTrue);
+    expect((await failingBackend.library.library()).isOk, isTrue);
+    expect(await failingStore.readSession(), isNotNull);
+    expect(await failingStore.readStudentLibrary(), isNotNull);
     failingApi.unreachable = true;
     final result = await failingBackend.auth.signOut();
     expect(result.errorOrNull, isA<UnexpectedBackendError>());
+    expect(await failingStore.readSession(), isNull);
+    expect(await failingStore.readStudentLibrary(), isNull);
   });
 
   test('a sign-in failure after login clears the stored auth', () async {
