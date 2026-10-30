@@ -224,15 +224,13 @@ void main() {
       findsNothing,
     );
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    final shell = tester.widget<RoleShell>(find.byType(RoleShell));
     final labels = [
-      for (final destination in rail.destinations)
-        (destination.label as Text).data,
+      for (final destination in shell.destinations) destination.label,
     ];
     expect(labels, [vi.navHome, vi.navLibrary]);
     semantics.dispose();
   });
-
   testWidgets('sign-out asks first; confirm returns to sign-in', (
     tester,
   ) async {
@@ -306,8 +304,14 @@ void main() {
     expect(rail.extended, isFalse);
     expect(find.byType(RoleShell), findsOneWidget);
     await pumpEduApp(tester, signedInAs: FixtureKeys.studentAn);
-    final large = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(large.extended, isTrue);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(RoleShellKeys.destinationPill(0)),
+        matching: find.text(vi.navHome),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('200% text on a phone reflows without overflow', (tester) async {

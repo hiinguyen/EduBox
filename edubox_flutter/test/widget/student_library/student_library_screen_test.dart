@@ -4,6 +4,7 @@ import 'package:edubox_flutter/src/features/library/content_row.dart';
 import 'package:edubox_flutter/src/screens/student_home/student_home_screen.dart';
 import 'package:edubox_flutter/src/screens/student_library/student_library_screen.dart';
 import 'package:edubox_flutter/src/shell/block_states.dart';
+import 'package:edubox_flutter/src/shell/role_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -158,8 +159,8 @@ void main() {
     await tester.tap(find.byKey(StudentHomeKeys.openLibrary));
     await tester.pumpAndSettle();
     expect(find.byKey(StudentLibraryKeys.header), findsOneWidget);
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.selectedIndex, 1);
+    final shell = tester.widget<RoleShell>(find.byType(RoleShell));
+    expect(shell.selectedIndex, 1);
   });
 
   testWidgets('phone: bottom bar with both destinations', (tester) async {

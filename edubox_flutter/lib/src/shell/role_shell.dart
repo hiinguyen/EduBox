@@ -5,6 +5,15 @@ import '../theme/theme_extensions.dart';
 import '../theme/tokens.dart';
 import 'edu_mark.dart';
 
+/// Stable keys for widget and E2E tests.
+abstract final class RoleShellKeys {
+  /// The extended rail's active destination pill, by destination index.
+  static Key destinationPill(int index) => Key('shell.destinationPill.$index');
+}
+
+/// The shell's fixed keys.
+const _railKey = Key('shell.rail');
+
 /// One navigation destination. Register a destination only in the phase
 /// that ships its screen: no disabled or "coming soon" items.
 class ShellDestination {
@@ -146,44 +155,24 @@ class RoleShell extends StatelessWidget {
   }
 
   Widget _rail(BuildContext context, WindowClass window) {
-    final extended = window.hasExtendedRail;
+    if (window.hasExtendedRail) return _extendedRail(context);
     return NavigationRail(
-      extended: extended,
-      minExtendedWidth: EduSize.railExtended,
+      key: _railKey,
       minWidth: EduSize.railCollapsed,
-      labelType: extended
-          ? NavigationRailLabelType.none
-          : NavigationRailLabelType.all,
+      labelType: NavigationRailLabelType.all,
       selectedIndex: selectedIndex,
       onDestinationSelected: onSelected,
-      leading: Padding(
-        padding: const EdgeInsets.only(
+      leading: const Padding(
+        padding: EdgeInsets.only(
           top: EduSpace.s16,
           bottom: EduSpace.s24,
         ),
-        child: extended
-            ? SizedBox(
-                width: EduSize.railExtended - 2 * EduSpace.s24,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const EduLockup(),
-                    const SizedBox(height: EduSpace.s16),
-                    scope,
-                  ],
-                ),
-              )
-            : const EduMarkGlyph(),
+        child: EduMarkGlyph(),
       ),
       trailingAtBottom: true,
       trailing: Padding(
         padding: const EdgeInsets.only(bottom: EduSpace.s16),
-        child: extended
-            ? SizedBox(
-                width: EduSize.railExtended - 2 * EduSpace.s24,
-                child: footer,
-              )
-            : (title == null ? accountButton : const SizedBox.shrink()),
+        child: title == null ? accountButton : const SizedBox.shrink(),
       ),
       destinations: [
         for (final destination in destinations)
@@ -193,6 +182,53 @@ class RoleShell extends StatelessWidget {
             label: Text(destination.label),
           ),
       ],
+    );
+  }
+
+  /// The large-class 240dp rail: destinations are icon + label rows, and
+  /// the selected row's label sits inside the neutral `active` pill.
+  Widget _extendedRail(BuildContext context) {
+    return SizedBox(
+      key: _railKey,
+      width: EduSize.railExtended,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EduSpace.s24,
+              EduSpace.s16,
+              EduSpace.s24,
+              EduSpace.s24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const EduLockup(),
+                const SizedBox(height: EduSpace.s16),
+                scope,
+              ],
+            ),
+          ),
+          for (final (index, destination) in destinations.indexed)
+            _ExtendedDestination(
+              destination: destination,
+              selected: index == selectedIndex,
+              pillKey: RoleShellKeys.destinationPill(index),
+              onTap: () => onSelected(index),
+            ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EduSpace.s24,
+              0,
+              EduSpace.s24,
+              EduSpace.s16,
+            ),
+            child: footer,
+          ),
+        ],
+      ),
     );
   }
 
@@ -212,6 +248,79 @@ class RoleShell extends StatelessWidget {
               label: destination.label,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// One extended-rail destination: a 48dp row whose selected state is the
+/// neutral `active` pill around the icon and its label.
+class _ExtendedDestination extends StatelessWidget {
+  const _ExtendedDestination({
+    required this.destination,
+    required this.selected,
+    required this.pillKey,
+    required this.onTap,
+  });
+
+  final ShellDestination destination;
+  final bool selected;
+  final Key pillKey;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = EduPalette.of(context);
+    final text = Theme.of(context).textTheme;
+    final color = selected ? palette.ink : palette.muted;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: EduSpace.s16,
+        vertical: 2,
+      ),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: SizedBox(
+          height: EduSize.tapTarget,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(EduRadius.control),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: AnimatedContainer(
+                  key: pillKey,
+                  duration: EduMotion.fast,
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: EduSpace.s12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected ? palette.active : Colors.transparent,
+                    borderRadius: BorderRadius.circular(EduRadius.control),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        selected ? destination.selectedIcon : destination.icon,
+                        size: 20,
+                        color: color,
+                      ),
+                      const SizedBox(width: EduSpace.s12),
+                      Text(
+                        destination.label,
+                        style: text.labelMedium!.copyWith(color: color),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

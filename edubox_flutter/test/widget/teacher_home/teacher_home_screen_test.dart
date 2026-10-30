@@ -1,7 +1,11 @@
 import 'package:edubox_fixtures/edubox_fixtures.dart';
 import 'package:edubox_flutter/src/contract/backend_result.dart';
+import 'package:edubox_flutter/src/contract/network_controller.dart';
+import 'package:edubox_flutter/src/fake/fake_backend.dart';
 import 'package:edubox_flutter/src/screens/sign_in/sign_in_screen.dart';
 import 'package:edubox_flutter/src/screens/teacher_home/teacher_home_screen.dart';
+import 'package:edubox_flutter/src/shell/role_shell.dart';
+import 'package:edubox_flutter/src/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -54,6 +58,30 @@ void main() {
     expect(find.text(vi.teacherClassesCount(3)), findsOneWidget);
   });
 
+  testWidgets('loading on a phone: stacked skeleton, no column heads', (
+    tester,
+  ) async {
+    final app = await pumpEduApp(
+      tester,
+      size: TestSizes.phone,
+      signedInAs: FixtureKeys.teacherLan,
+      settle: false,
+    );
+    app.fake.holdCalls();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text(vi.teacherClassesTitle), findsOneWidget);
+    expect(find.byKey(TeacherHomeKeys.stackedSkeleton), findsOneWidget);
+    expect(find.text(vi.classColumnName), findsNothing);
+    expect(find.text(vi.classColumnGrade), findsNothing);
+    expect(find.text(vi.classColumnSubjects), findsNothing);
+    expect(find.text(vi.classColumnStudents), findsNothing);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.releaseCalls();
+    await tester.pumpAndSettle();
+    expect(find.byKey(TeacherHomeKeys.stacked), findsOneWidget);
+  });
+
   testWidgets('empty: 0 classes, the sentence, no header row', (tester) async {
     await pumpEduApp(tester, signedInAs: FixtureKeys.teacherNoClass);
     expect(find.text(vi.teacherClassesCount(0)), findsOneWidget);
@@ -72,6 +100,34 @@ void main() {
     expect(find.text('7A'), findsOneWidget);
     await expectAccessibilityGuidelines(tester);
   });
+
+  testWidgets(
+    'offline with cache: an older snapshot reads networkOfflineStale',
+    (
+      tester,
+    ) async {
+      var now = fixedClock();
+      final network = ManualNetworkController();
+      final fake = FakeBackend(network: network, clock: () => now.toUtc());
+      fake.signInAs(FixtureKeys.teacherLan);
+      network.goOffline();
+      await pumpEduApp(tester, fake: fake, network: network);
+      expect(find.text(vi.networkOffline), findsOneWidget);
+      expect(find.text(vi.networkOfflineStale), findsNothing);
+      // The profile refreshes on reconnect while the classes reload fails,
+      // so the kept snapshot is older than the last profile refresh.
+      fake.classesError = const UnexpectedBackendError();
+      now = now.add(const Duration(minutes: 5));
+      network.goOnline();
+      await tester.pumpAndSettle();
+      network.goOffline();
+      await tester.pumpAndSettle();
+      expect(find.text(vi.networkOfflineStale), findsOneWidget);
+      expect(find.text(vi.networkOffline), findsNothing);
+      expect(find.text('7A'), findsOneWidget);
+      await expectAccessibilityGuidelines(tester);
+    },
+  );
 
   testWidgets('offline without cache: neutral sentence, never empty', (
     tester,
@@ -114,6 +170,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(vi.teacherClassesStaleError('09:14')), findsOneWidget);
     expect(find.text('7A'), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
   });
 
   testWidgets('reconnect: the new class appears without user action', (
@@ -148,6 +205,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(vi.signOutFailed), findsOneWidget);
     expect(find.byKey(TeacherHomeKeys.panel), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
     app.fake.clearFailures();
     await tester.tap(find.text(vi.retry));
     await tester.pumpAndSettle();
@@ -163,6 +221,12 @@ void main() {
     expect(find.byKey(TeacherHomeKeys.stacked), findsOneWidget);
     expect(find.text(vi.classStudentCount(1)), findsWidgets);
     expect(find.text(vi.classGradeValue(7)), findsWidgets);
+    final count = tester.widget<Text>(
+      find.text(vi.classStudentCount(1)).first,
+    );
+    expect(count.style?.fontFamily, EduFonts.mono);
+    final grade = tester.widget<Text>(find.text(vi.classGradeValue(7)).first);
+    expect(grade.style?.fontFamily, EduFonts.mono);
     expect(find.byType(NavigationBar), findsNothing);
     await expectAccessibilityGuidelines(tester);
     await tester.tap(find.byKey(const Key('shell.accountMenu')));
@@ -183,6 +247,53 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.byKey(TeacherHomeKeys.stacked), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+  });
+
+  testWidgets('rows are inert and the nav lists only the built destination', (
+    tester,
+  ) async {
+    await pumpEduApp(tester, signedInAs: FixtureKeys.teacherLan);
+    for (final row in [TeacherHomeKeys.table, TeacherHomeKeys.stacked]) {
+      if (find.byKey(row).evaluate().isEmpty) continue;
+      expect(
+        find.descendant(of: find.byKey(row), matching: find.byType(InkWell)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(row),
+          matching: find.byType(GestureDetector),
+        ),
+        findsNothing,
+      );
+    }
+    final shell = tester.widget<RoleShell>(find.byType(RoleShell));
+    expect(
+      [for (final destination in shell.destinations) destination.label],
+      [vi.navTeacherOverview],
+    );
+  });
+
+  testWidgets('tablet: the active label sits inside its nav pill', (
+    tester,
+  ) async {
+    await pumpEduApp(tester, signedInAs: FixtureKeys.teacherLan);
+    final pill = find.byKey(RoleShellKeys.destinationPill(0));
+    expect(pill, findsOneWidget);
+    expect(
+      find.descendant(of: pill, matching: find.text(vi.navTeacherOverview)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tablet: the ledger ends with the panel padding', (tester) async {
+    await pumpEduApp(tester, signedInAs: FixtureKeys.teacherLan);
+    final panelBottom = tester
+        .getBottomLeft(find.byKey(TeacherHomeKeys.panel))
+        .dy;
+    final lastRowBottom = tester.getBottomLeft(find.text('8A')).dy;
+    expect(panelBottom - lastRowBottom, closeTo(EduSpace.s16, 2));
   });
 
   for (final (name, size) in [

@@ -16,6 +16,8 @@ abstract final class TeacherHomeKeys {
   static const panel = Key('teacherHome.classesPanel');
   static const table = Key('teacherHome.table');
   static const stacked = Key('teacherHome.stacked');
+  static const tableSkeleton = Key('teacherHome.tableSkeleton');
+  static const stackedSkeleton = Key('teacherHome.stackedSkeleton');
 }
 
 /// Classes sorted by grade (numeric), then name (Vietnamese-aware).
@@ -24,6 +26,17 @@ List<ClassSummary> sortClasses(List<ClassSummary> classes) =>
       final byGrade = a.gradeLevel.compareTo(b.gradeLevel);
       return byGrade != 0 ? byGrade : compareVietnamese(a.name, b.name);
     });
+
+/// The four columns fit only on a compact-free width at normal text scale;
+/// otherwise every value carries its own unit or label on two lines.
+bool _usesStackedRows(
+  BuildContext context,
+  double maxWidth,
+  bool compact,
+) {
+  final scale = MediaQuery.textScalerOf(context).scale(1);
+  return compact || scale >= 1.5 || maxWidth < 560;
+}
 
 /// `teacher-home` (docs/design/shapes/teacher-home.md): the "Lớp của tôi"
 /// ledger (Lớp | Khối | Môn học | Học sinh). No dominant accent and no
@@ -80,7 +93,7 @@ class _ClassesPanel extends StatelessWidget {
         label: l10n.teacherClassesLoading,
         liveRegion: true,
         container: true,
-        child: const _Skeleton(),
+        child: _Skeleton(compact: compact),
       );
     } else if (value == null) {
       body = error is OfflineNoCacheError
@@ -105,7 +118,6 @@ class _ClassesPanel extends StatelessWidget {
       );
     } else {
       final sorted = sortClasses(value);
-      final scale = MediaQuery.textScalerOf(context).scale(1);
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -134,9 +146,7 @@ class _ClassesPanel extends StatelessWidget {
             label: l10n.teacherClassesLoaded(sorted.length),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final stacked =
-                    compact || scale >= 1.5 || constraints.maxWidth < 560;
-                return stacked
+                return _usesStackedRows(context, constraints.maxWidth, compact)
                     ? _StackedRows(classes: sorted)
                     : _Table(classes: sorted);
               },
@@ -238,10 +248,15 @@ class _Table extends StatelessWidget {
             label: _rowLabel(l10n, item),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: EduDensity.of(context).rowHeight,
+                minHeight: index == classes.length - 1
+                    ? 0
+                    : EduDensity.of(context).rowHeight,
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: EduSpace.s12),
+                padding: EdgeInsets.only(
+                  top: EduSpace.s12,
+                  bottom: index == classes.length - 1 ? 0 : EduSpace.s12,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -288,6 +303,7 @@ class _StackedRows extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final text = Theme.of(context).textTheme;
+    final extras = EduTypeExtras.of(context);
     final palette = EduPalette.of(context);
     final muted = text.bodyMedium!.copyWith(color: palette.muted);
     return Column(
@@ -301,9 +317,14 @@ class _StackedRows extends StatelessWidget {
             excludeSemantics: true,
             label: _rowLabel(l10n, item),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 64),
+              constraints: BoxConstraints(
+                minHeight: index == classes.length - 1 ? 0 : 64,
+              ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: EduSpace.s12),
+                padding: EdgeInsets.only(
+                  top: EduSpace.s12,
+                  bottom: index == classes.length - 1 ? 0 : EduSpace.s12,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -315,7 +336,7 @@ class _StackedRows extends StatelessWidget {
                         ),
                         Text(
                           l10n.classStudentCount(item.studentCount),
-                          style: text.bodyMedium,
+                          style: extras.figureTeacher,
                         ),
                       ],
                     ),
@@ -325,7 +346,7 @@ class _StackedRows extends StatelessWidget {
                       children: [
                         Text(
                           l10n.classGradeValue(item.gradeLevel),
-                          style: muted,
+                          style: extras.figureTeacher,
                         ),
                         const MetaDot(),
                         _Subjects(subjects: item.subjects, style: muted),
@@ -380,13 +401,32 @@ String _rowLabel(AppLocalizations l10n, ClassSummary item) =>
     );
 
 class _Skeleton extends StatelessWidget {
-  const _Skeleton();
+  const _Skeleton({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return _usesStackedRows(context, constraints.maxWidth, compact)
+            ? const _StackedSkeleton()
+            : const _TableSkeleton();
+      },
+    );
+  }
+}
+
+/// The wide ledger's loading frame: the four column heads and three rows.
+class _TableSkeleton extends StatelessWidget {
+  const _TableSkeleton();
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final header = Theme.of(context).textTheme.bodySmall;
     return Column(
+      key: TeacherHomeKeys.tableSkeleton,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ExcludeSemantics(
@@ -455,6 +495,55 @@ class _Skeleton extends StatelessWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// The stacked loading frame: no column heads, two bookkeeping lines per
+/// row, in the same order the loaded stacked rows use.
+class _StackedSkeleton extends StatelessWidget {
+  const _StackedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: TeacherHomeKeys.stackedSkeleton,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var row = 0; row < 3; row++) ...[
+          if (row > 0) const Divider(),
+          const SizedBox(
+            height: 64,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: EduSpace.s12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: SkeletonBar(width: 120, height: 14),
+                        ),
+                      ),
+                      SkeletonBar(width: 64, height: 14),
+                    ],
+                  ),
+                  SizedBox(height: EduSpace.s4),
+                  Row(
+                    children: [
+                      SkeletonBar(width: 40, height: 12),
+                      SizedBox(width: EduSpace.s8),
+                      SkeletonBar(width: 160, height: 12),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
