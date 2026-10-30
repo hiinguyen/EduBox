@@ -36,6 +36,7 @@ class _FakeProbe implements ReachabilityProbe {
 
   bool reachable;
   bool throws = false;
+  bool closed = false;
   int calls = 0;
   Completer<void>? gate;
 
@@ -47,6 +48,9 @@ class _FakeProbe implements ReachabilityProbe {
     if (throws) throw StateError('probe exploded');
     return reachable;
   }
+
+  @override
+  void close() => closed = true;
 }
 
 void main() {
@@ -59,6 +63,13 @@ void _controllerTests() {
   late _FakeProbe probe;
   late ProbedNetworkController controller;
   late List<NetworkStatus> seen;
+  late bool disposed;
+
+  void disposeController() {
+    if (disposed) return;
+    controller.dispose();
+    disposed = true;
+  }
 
   Future<void> build({required bool up, required bool reachable}) async {
     connectivity = _FakeConnectivity(up);
@@ -68,6 +79,7 @@ void _controllerTests() {
       probe: probe,
       probeInterval: Duration.zero,
     );
+    disposed = false;
     seen = [];
     controller.changes.listen(seen.add);
     await controller.start();
@@ -75,7 +87,7 @@ void _controllerTests() {
     seen.clear();
   }
 
-  tearDown(() => controller.dispose());
+  tearDown(disposeController);
 
   test('network up and server answering is online', () async {
     await build(up: true, reachable: true);
@@ -146,6 +158,7 @@ void _controllerTests() {
       probe: probe,
       probeInterval: Duration.zero,
     );
+    disposed = false;
     await controller.start();
     expect(controller.status, NetworkStatus.offline);
     connectivity.controller.addError(StateError('stream failed'));
@@ -160,6 +173,69 @@ void _controllerTests() {
     await connectivity.emit(false);
     await connectivity.emit(true);
     expect(notified, 3);
+  });
+
+  test(
+    'an older probe resolving last never overwrites a newer result',
+    () async {
+      await build(up: true, reachable: false);
+      final slow = Completer<void>();
+      probe.gate = slow;
+      final older = controller.probeNow();
+      probe.gate = null;
+      probe.reachable = true;
+      await controller.probeNow();
+      expect(controller.status, NetworkStatus.online);
+      probe.reachable = false;
+      slow.complete();
+      await older;
+      expect(controller.status, NetworkStatus.online);
+    },
+  );
+
+  testWidgets('the periodic timer re-probes, and dispose cancels it', (
+    tester,
+  ) async {
+    connectivity = _FakeConnectivity(true);
+    probe = _FakeProbe(true);
+    controller = ProbedNetworkController(
+      connectivity: connectivity,
+      probe: probe,
+      probeInterval: const Duration(seconds: 15),
+    );
+    disposed = false;
+    await controller.start();
+    expect(probe.calls, 1);
+    await tester.pump(const Duration(seconds: 15));
+    await tester.pump();
+    expect(probe.calls, 2);
+    disposeController();
+    expect(probe.closed, isTrue);
+    await tester.pump(const Duration(minutes: 2));
+    expect(probe.calls, 2);
+  });
+
+  testWidgets('dispose while start awaits leaves no timer or probe running', (
+    tester,
+  ) async {
+    connectivity = _FakeConnectivity(true);
+    probe = _FakeProbe(true)..gate = Completer<void>();
+    controller = ProbedNetworkController(
+      connectivity: connectivity,
+      probe: probe,
+      probeInterval: const Duration(seconds: 15),
+    );
+    disposed = false;
+    final starting = controller.start();
+    await tester.pump();
+    expect(probe.calls, 1);
+    disposeController();
+    probe.gate!.complete();
+    await starting;
+    // A leaked Timer.periodic would fail this test when it ends; advancing
+    // time also proves no further probe starts.
+    await tester.pump(const Duration(minutes: 1));
+    expect(probe.calls, 1);
   });
 }
 

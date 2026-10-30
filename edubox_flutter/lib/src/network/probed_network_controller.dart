@@ -17,6 +17,9 @@ abstract interface class ConnectivitySource {
 /// is `false`.
 abstract interface class ReachabilityProbe {
   Future<bool> isReachable();
+
+  /// Releases resources the probe owns (a keep-alive HTTP client).
+  void close();
 }
 
 /// The production [NetworkController] (contract.md section 3.5).
@@ -48,7 +51,9 @@ class ProbedNetworkController extends ChangeNotifier
   StreamSubscription<bool>? _connectivitySub;
   Timer? _timer;
   bool _hasNetwork = false;
+  bool _started = false;
   bool _disposed = false;
+  int _probeSeq = 0;
   NetworkStatus _status = NetworkStatus.offline;
 
   @override
@@ -60,27 +65,40 @@ class ProbedNetworkController extends ChangeNotifier
   @override
   Stream<NetworkStatus> get changes => _changes.stream;
 
-  /// Reads the first state and starts listening. Call once.
+  /// Reads the first state and starts listening. Call once; later calls and
+  /// calls after [dispose] do nothing.
   Future<void> start() async {
+    if (_started || _disposed) return;
+    _started = true;
     _connectivitySub = connectivity.changes.listen(
       (up) => unawaited(_onConnectivity(up)),
-      onError: (Object _) => _set(NetworkStatus.offline),
+      onError: (Object _) {
+        _hasNetwork = false;
+        _set(NetworkStatus.offline);
+      },
     );
     _hasNetwork = await _safeHasNetwork();
+    if (_disposed) return;
     await probeNow();
+    if (_disposed) return;
     if (probeInterval > Duration.zero) {
       _timer = Timer.periodic(probeInterval, (_) => unawaited(probeNow()));
     }
   }
 
   /// Probes the server now and updates [status]. Never throws.
+  ///
+  /// Only the newest probe applies: an older probe that resolves after a
+  /// newer one is discarded, so a slow result cannot overwrite a fresh one.
   Future<void> probeNow() async {
+    final seq = ++_probeSeq;
+    if (_disposed) return;
     if (!_hasNetwork) {
       _set(NetworkStatus.offline);
       return;
     }
     final reachable = await _safeProbe();
-    if (_disposed) return;
+    if (_disposed || seq != _probeSeq) return;
     if (!_hasNetwork) {
       _set(NetworkStatus.offline);
       return;
@@ -89,6 +107,7 @@ class ProbedNetworkController extends ChangeNotifier
   }
 
   Future<void> _onConnectivity(bool up) async {
+    if (_disposed) return;
     final wasUp = _hasNetwork;
     _hasNetwork = up;
     if (!up) {
@@ -130,6 +149,7 @@ class ProbedNetworkController extends ChangeNotifier
     _timer?.cancel();
     unawaited(_connectivitySub?.cancel());
     unawaited(_changes.close());
+    probe.close();
     super.dispose();
   }
 }

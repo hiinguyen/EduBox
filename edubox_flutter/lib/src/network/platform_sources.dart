@@ -55,4 +55,7 @@ class HttpReachabilityProbe implements ReachabilityProbe {
       return false;
     }
   }
+
+  @override
+  void close() => _client.close();
 }
