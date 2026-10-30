@@ -176,6 +176,39 @@ class EndpointDiagnostics extends EndpointEdubox {
       );
 }
 
+/// The token-guarded route the on-device E2E harness uses to change
+/// server-side state mid-run (exit criterion 7 and the account-not-set-up
+/// check-again case).
+///
+/// It is disabled unless the run-mode config has `edubox.e2eControl: true` or
+/// `EDUBOX_E2E_CONTROL=true`, and it always requires the
+/// `e2eControlToken` password. The contract is in
+/// docs/build/phase-1/contract.md section 2.8.
+/// {@category Endpoint}
+class EndpointE2e extends _isc.EndpointRef {
+  EndpointE2e(_isc.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'e2e';
+
+  /// Runs one control operation and returns `ok:<step>`.
+  _ida.Future<String> run({
+    required String token,
+    required String step,
+    String? accountKey,
+    String? role,
+  }) => caller.callServerEndpoint<String>(
+    'e2e',
+    'run',
+    {
+      'token': token,
+      'step': step,
+      'accountKey': accountKey,
+      'role': role,
+    },
+  );
+}
+
 /// The caller's own profile.
 /// {@category Endpoint}
 class EndpointProfile extends EndpointEdubox {
@@ -240,6 +273,7 @@ class Client extends _isc.ServerpodClientShared {
     classes = EndpointClasses(this);
     content = EndpointContent(this);
     diagnostics = EndpointDiagnostics(this);
+    e2e = EndpointE2e(this);
     profile = EndpointProfile(this);
     modules = Modules(this);
   }
@@ -254,6 +288,8 @@ class Client extends _isc.ServerpodClientShared {
 
   late final EndpointDiagnostics diagnostics;
 
+  late final EndpointE2e e2e;
+
   late final EndpointProfile profile;
 
   late final Modules modules;
@@ -265,6 +301,7 @@ class Client extends _isc.ServerpodClientShared {
     'classes': classes,
     'content': content,
     'diagnostics': diagnostics,
+    'e2e': e2e,
     'profile': profile,
   };
 

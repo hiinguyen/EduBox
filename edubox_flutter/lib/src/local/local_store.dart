@@ -119,6 +119,16 @@ class EduBoxDatabase extends _$EduBoxDatabase {
   int get schemaVersion => 1;
 }
 
+/// A cached value together with the time of the last successful server
+/// refresh that produced it. Data repositories surface this time as
+/// `BackendOk.cachedAt` (and `isStale` for an offline read).
+class CachedValue<T> {
+  const CachedValue({required this.value, required this.cachedAt});
+
+  final T value;
+  final DateTime cachedAt;
+}
+
 /// Read/write access to the phase 1 drift cache.
 ///
 /// The frontend track composes this with the network seam: online calls save
@@ -159,13 +169,17 @@ class CachedDataStore {
     });
   }
 
-  Future<AuthSession?> readSession() async {
-    if (!await _hasSnapshot(_sessionKind)) return null;
+  Future<CachedValue<AuthSession>?> readSession() async {
+    final cachedAt = await _snapshotTime(_sessionKind);
+    if (cachedAt == null) return null;
     final row = await db.select(db.cachedProfiles).getSingleOrNull();
     if (row == null) return null;
-    return AuthSession(
-      signedInEmail: row.signedInEmail,
-      profileResult: _profileResultFromRow(row),
+    return CachedValue(
+      value: AuthSession(
+        signedInEmail: row.signedInEmail,
+        profileResult: _profileResultFromRow(row),
+      ),
+      cachedAt: cachedAt,
     );
   }
 
@@ -197,21 +211,25 @@ class CachedDataStore {
     });
   }
 
-  Future<List<ClassSummary>?> readTeacherClasses() async {
-    if (!await _hasSnapshot(_teacherClassesKind)) return null;
+  Future<CachedValue<List<ClassSummary>>?> readTeacherClasses() async {
+    final cachedAt = await _snapshotTime(_teacherClassesKind);
+    if (cachedAt == null) return null;
     final rows = await (db.select(
       db.cachedClasses,
     )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
-    return [
-      for (final row in rows)
-        ClassSummary(
-          id: row.id,
-          name: row.name,
-          gradeLevel: row.gradeLevel,
-          subjects: _stringList(row.subjectsJson),
-          studentCount: row.studentCount,
-        ),
-    ];
+    return CachedValue(
+      value: [
+        for (final row in rows)
+          ClassSummary(
+            id: row.id,
+            name: row.name,
+            gradeLevel: row.gradeLevel,
+            subjects: _stringList(row.subjectsJson),
+            studentCount: row.studentCount,
+          ),
+      ],
+      cachedAt: cachedAt,
+    );
   }
 
   Future<void> saveStudentLibrary(StudentLibrary library) async {
@@ -247,35 +265,39 @@ class CachedDataStore {
     });
   }
 
-  Future<StudentLibrary?> readStudentLibrary() async {
-    if (!await _hasSnapshot(_studentLibraryKind)) return null;
+  Future<CachedValue<StudentLibrary>?> readStudentLibrary() async {
+    final cachedAt = await _snapshotTime(_studentLibraryKind);
+    if (cachedAt == null) return null;
     final classRows = await (db.select(
       db.cachedLibraryClasses,
     )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
     final itemRows = await (db.select(
       db.cachedLibraryItems,
     )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
-    return StudentLibrary(
-      classes: [
-        for (final row in classRows)
-          StudentClass(
-            id: row.id,
-            name: row.name,
-            gradeLevel: row.gradeLevel,
-            subjects: _stringList(row.subjectsJson),
-          ),
-      ],
-      items: [
-        for (final row in itemRows)
-          LibraryItem(
-            id: row.id,
-            type: ContentType.values.byName(row.type),
-            title: row.title,
-            subject: row.subject,
-            gradeLevel: row.gradeLevel,
-            createdAt: row.createdAt,
-          ),
-      ],
+    return CachedValue(
+      value: StudentLibrary(
+        classes: [
+          for (final row in classRows)
+            StudentClass(
+              id: row.id,
+              name: row.name,
+              gradeLevel: row.gradeLevel,
+              subjects: _stringList(row.subjectsJson),
+            ),
+        ],
+        items: [
+          for (final row in itemRows)
+            LibraryItem(
+              id: row.id,
+              type: ContentType.values.byName(row.type),
+              title: row.title,
+              subject: row.subject,
+              gradeLevel: row.gradeLevel,
+              createdAt: row.createdAt,
+            ),
+        ],
+      ),
+      cachedAt: cachedAt,
     );
   }
 
@@ -295,11 +317,15 @@ class CachedDataStore {
     });
   }
 
-  Future<ParentHomeData?> readParentHome() async {
-    if (!await _hasSnapshot(_parentHomeKind)) return null;
+  Future<CachedValue<ParentHomeData>?> readParentHome() async {
+    final cachedAt = await _snapshotTime(_parentHomeKind);
+    if (cachedAt == null) return null;
     final row = await db.select(db.cachedParentHomes).getSingleOrNull();
     if (row == null) return null;
-    return ParentHomeData(linkedStudentName: row.linkedStudentName);
+    return CachedValue(
+      value: ParentHomeData(linkedStudentName: row.linkedStudentName),
+      cachedAt: cachedAt,
+    );
   }
 
   Future<void> clearAll() async {
@@ -316,10 +342,11 @@ class CachedDataStore {
 
   Future<void> close() => db.close();
 
-  Future<bool> _hasSnapshot(String kind) async {
+  Future<DateTime?> _snapshotTime(String kind) async {
     final query = db.select(db.cachedSnapshots)
       ..where((t) => t.kind.equals(kind));
-    return await query.getSingleOrNull() != null;
+    final row = await query.getSingleOrNull();
+    return row?.cachedAt;
   }
 
   Future<void> _markSnapshot(String kind, DateTime cachedAt) async {

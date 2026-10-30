@@ -3,8 +3,9 @@ import 'dart:io';
 /// Phase 1 coverage gate (roadmap exit criterion 14).
 ///
 /// Reads an lcov file produced by `dart test --coverage` and enforces 80%
-/// line coverage for each existing gated source directory. Directories that
-/// do not exist yet are skipped, as the roadmap requires.
+/// line coverage for each gated source directory that exists. A directory that
+/// is absent is skipped, as the roadmap requires; a directory that exists but
+/// has no lcov records fails instead of being silently skipped.
 void main(List<String> args) {
   final path = args.isEmpty ? 'coverage/lcov.info' : args.first;
   final file = File(path);
@@ -13,6 +14,9 @@ void main(List<String> args) {
     exitCode = 2;
     return;
   }
+
+  // `coverage/lcov.info` -> the package root that owns `lib/`.
+  final sourceRoot = file.parent.parent;
 
   const gates = <String, String>{
     'authorization': 'lib/src/authz/',
@@ -43,14 +47,22 @@ void main(List<String> args) {
   var failed = false;
   var gated = 0;
   for (final MapEntry(key: name, value: prefix) in gates.entries) {
-    final records = lines.entries.where(
-      (entry) => entry.key.startsWith(prefix),
-    );
-    if (records.isEmpty) {
+    final directory = Directory.fromUri(sourceRoot.uri.resolve(prefix));
+    if (!directory.existsSync()) {
       stdout.writeln('coverage gate: $name skipped (no source directory)');
       continue;
     }
     gated++;
+    final records = lines.entries.where(
+      (entry) => entry.key.startsWith(prefix),
+    );
+    if (records.isEmpty) {
+      stderr.writeln(
+        'coverage gate: $name FAIL ($prefix exists but lcov has no records)',
+      );
+      failed = true;
+      continue;
+    }
     var found = 0;
     var hit = 0;
     for (final record in records) {
@@ -59,7 +71,7 @@ void main(List<String> args) {
         if (count > 0) hit++;
       }
     }
-    final percent = found == 0 ? 100.0 : hit * 100 / found;
+    final percent = found == 0 ? 0.0 : hit * 100 / found;
     final ok = percent >= 80;
     stdout.writeln(
       'coverage gate: $name ${percent.toStringAsFixed(1)}% '

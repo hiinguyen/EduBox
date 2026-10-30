@@ -8,5 +8,7 @@ content:
   - library:
 diagnostics:
   - pingStream:
+e2e:
+  - run:
 profile:
   - me:

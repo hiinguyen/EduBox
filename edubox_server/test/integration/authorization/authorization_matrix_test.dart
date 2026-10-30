@@ -19,6 +19,7 @@ void main() {
         edubox,
         moduleUnauthenticatedExceptions.keys.toSet(),
         frameworkUnauthenticatedExceptions.keys.toSet(),
+        tokenGuardedE2eMethods.keys.toSet(),
         moduleDeniedUnauthenticated,
       ];
       final listed = <String>{};
@@ -76,15 +77,13 @@ void main() {
           }
         }
 
-        if (!rule.isStream) {
-          final [endpoint, method] = methodKey.split('.');
-          test('denies anonymous through the HTTP dispatch path', () async {
-            await expectLater(
-              callThroughDispatch(anonymous(sessionBuilder), endpoint, method),
-              throwsA(isA<NotAuthorizedException>()),
-            );
-          });
-        }
+        final [endpoint, method] = methodKey.split('.');
+        test('denies anonymous through the HTTP dispatch path', () async {
+          await expectLater(
+            callThroughDispatch(anonymous(sessionBuilder), endpoint, method),
+            throwsA(isA<NotAuthorizedException>()),
+          );
+        });
       });
     }
   });

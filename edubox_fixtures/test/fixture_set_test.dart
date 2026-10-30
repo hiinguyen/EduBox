@@ -54,14 +54,19 @@ void main() {
       delta.libraryOfStudent(FixtureKeys.studentAn).first.key,
       FixtureKeys.deltaReviewEbook,
     );
-    expect(
-      delta.classesOfTeacher(FixtureKeys.teacherLan).map((c) => c.name),
-      ['7A', '7B', '8A', '8B'],
-    );
+    expect(delta.classesOfTeacher(FixtureKeys.teacherLan).map((c) => c.name), [
+      '7A',
+      '7B',
+      '8A',
+      '8B',
+    ]);
   });
 
   test('parent Binh is linked to An; parent Thao has no child', () {
-    expect(fixtures.linkedStudentNameOf(FixtureKeys.parentBinh), 'Nguyễn Minh An');
+    expect(
+      fixtures.linkedStudentNameOf(FixtureKeys.parentBinh),
+      'Nguyễn Minh An',
+    );
     expect(fixtures.linkedStudentNameOf(FixtureKeys.parentNoChild), isNull);
   });
 }

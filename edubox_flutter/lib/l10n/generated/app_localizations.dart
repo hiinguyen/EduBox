@@ -523,7 +523,7 @@ abstract class AppLocalizations {
   /// No description provided for @networkOffline.
   ///
   /// In vi, this message translates to:
-  /// **'Đang ngoại tuyến. Tài liệu đã tải về vẫn mở được.'**
+  /// **'Đang ngoại tuyến. Dữ liệu đã lưu vẫn hiển thị.'**
   String get networkOffline;
 
   /// No description provided for @networkOfflineStale.

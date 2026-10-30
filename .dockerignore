@@ -1,0 +1,11 @@
+# Keep the git-ignored secrets and local build output out of image layers.
+edubox_server/config/passwords.yaml
+
+# Dart/Flutter build output and coverage (any workspace member).
+.git/
+.github/
+**/.dart_tool/
+**/build/
+**/coverage/
+edubox_flutter/
+edubox_client/

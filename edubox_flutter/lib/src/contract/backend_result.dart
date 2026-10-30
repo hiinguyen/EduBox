@@ -35,6 +35,14 @@ final class PermissionDeniedError extends BackendError {
   const PermissionDeniedError();
 }
 
+/// There is no session, or the stored session expired or was revoked.
+///
+/// Screens route this to sign-in; [PermissionDeniedError] means the caller is
+/// signed in but their role may not perform the call.
+final class SessionExpiredError extends BackendError {
+  const SessionExpiredError();
+}
+
 /// The caller is offline and the local store has no cached value.
 final class OfflineNoCacheError extends BackendError {
   const OfflineNoCacheError();
@@ -77,6 +85,20 @@ sealed class BackendResult<T> {
     BackendFailure<T>(:final error) => error,
   };
 
+  /// When this result was last refreshed from the server, or null when the
+  /// repository did not supply a timestamp (e.g. a non-cached failure).
+  DateTime? get cachedAt => switch (this) {
+    BackendOk<T>(:final cachedAt) => cachedAt,
+    BackendFailure<T>() => null,
+  };
+
+  /// True when this success was served from the local store while the
+  /// network seam was offline or reconnecting.
+  bool get isStale => switch (this) {
+    BackendOk<T>(:final isStale) => isStale,
+    BackendFailure<T>() => false,
+  };
+
   R fold<R>({
     required R Function(T value) ok,
     required R Function(BackendError error) failure,
@@ -87,9 +109,18 @@ sealed class BackendResult<T> {
 }
 
 final class BackendOk<T> extends BackendResult<T> {
-  const BackendOk(this.value);
+  const BackendOk(this.value, {this.cachedAt, this.isStale = false});
 
   final T value;
+
+  /// The last successful server refresh that produced (or confirmed) [value].
+  @override
+  /// Cached reads carry the snapshot's original time, not the read time.
+  final DateTime? cachedAt;
+
+  /// True for a local-store read while offline/reconnecting.
+  @override
+  final bool isStale;
 }
 
 final class BackendFailure<T> extends BackendResult<T> {

@@ -255,8 +255,7 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get networkOffline =>
-      'Đang ngoại tuyến. Tài liệu đã tải về vẫn mở được.';
+  String get networkOffline => 'Đang ngoại tuyến. Dữ liệu đã lưu vẫn hiển thị.';
 
   @override
   String get networkOfflineStale =>

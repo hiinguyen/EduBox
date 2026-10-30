@@ -64,14 +64,15 @@ class FixtureSet {
   /// newest first. This is exactly what `content.library` must return.
   List<ContentFixture> libraryOfStudent(String studentKey) {
     final classKeys = classesOfStudent(studentKey).map((c) => c.key).toSet();
-    final result = content
-        .where(
-          (item) =>
-              item.status == FixtureContentStatus.approved &&
-              item.classKeys.any(classKeys.contains),
-        )
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final result =
+        content
+            .where(
+              (item) =>
+                  item.status == FixtureContentStatus.approved &&
+                  item.classKeys.any(classKeys.contains),
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return result;
   }
 

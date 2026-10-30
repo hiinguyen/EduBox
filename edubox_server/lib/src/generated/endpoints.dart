@@ -20,6 +20,7 @@ import '../auth/jwt_refresh_endpoint.dart' as _inwq3ztq;
 import '../classes/classes_endpoint.dart' as _iajgymx3;
 import '../content/content_endpoint.dart' as _ib9irne6;
 import '../diagnostics/diagnostics_endpoint.dart' as _i80y0535;
+import '../e2e/e2e_endpoint.dart' as _iy8dln60;
 import '../profile/profile_endpoint.dart' as _i6ky944g;
 
 class Endpoints extends _is.EndpointDispatch {
@@ -54,6 +55,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'diagnostics',
+          null,
+        ),
+      'e2e': _iy8dln60.E2eEndpoint()
+        ..initialize(
+          server,
+          'e2e',
           null,
         ),
       'profile': _i6ky944g.ProfileEndpoint()
@@ -168,6 +175,48 @@ class Endpoints extends _is.EndpointDispatch {
                 Map<String, Stream> streamParams,
               ) => (endpoints['diagnostics'] as _i80y0535.DiagnosticsEndpoint)
                   .pingStream(session),
+        ),
+      },
+    );
+    connectors['e2e'] = _is.EndpointConnector(
+      name: 'e2e',
+      endpoint: endpoints['e2e']!,
+      methodConnectors: {
+        'run': _is.MethodConnector(
+          name: 'run',
+          params: {
+            'token': _is.ParameterDescription(
+              name: 'token',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'step': _is.ParameterDescription(
+              name: 'step',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'accountKey': _is.ParameterDescription(
+              name: 'accountKey',
+              type: _is.getType<String?>(),
+              nullable: true,
+            ),
+            'role': _is.ParameterDescription(
+              name: 'role',
+              type: _is.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['e2e'] as _iy8dln60.E2eEndpoint).run(
+                session,
+                token: params['token'],
+                step: params['step'],
+                accountKey: params['accountKey'],
+                role: params['role'],
+              ),
         ),
       },
     );

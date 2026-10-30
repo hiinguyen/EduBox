@@ -35,17 +35,25 @@ void main() {
         expect(result, isFalse);
       });
 
-      test('signOutDevice and signOutAllDevices change nothing', () async {
-        final before = await authUserCount();
-        for (final method in ['signOutDevice', 'signOutAllDevices']) {
-          await callThroughDispatch(
-            anonymous(sessionBuilder),
-            'serverpod_auth_core.status',
-            method,
-          );
-        }
-        expect(await authUserCount(), before);
-      });
+      test(
+        'signOutDevice and signOutAllDevices change no auth state',
+        () async {
+          final session = sessionBuilder.build();
+          final authUsers = await AuthUser.db.count(session);
+          final sessions = await ServerSideSession.db.count(session);
+          final refreshTokens = await RefreshToken.db.count(session);
+          for (final method in ['signOutDevice', 'signOutAllDevices']) {
+            await callThroughDispatch(
+              anonymous(sessionBuilder),
+              'serverpod_auth_core.status',
+              method,
+            );
+          }
+          expect(await AuthUser.db.count(session), authUsers);
+          expect(await ServerSideSession.db.count(session), sessions);
+          expect(await RefreshToken.db.count(session), refreshTokens);
+        },
+      );
     });
 
     test('userProfileInfo.get denies an unauthenticated caller', () async {

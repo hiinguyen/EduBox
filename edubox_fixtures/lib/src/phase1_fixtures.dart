@@ -13,15 +13,20 @@ abstract final class FixtureKeys {
   static const studentHa = 'student_ha';
   static const studentBao = 'student_bao';
   static const studentNoClass = 'student_no_class';
+  static const studentEmpty = 'student_empty';
   static const teacherLan = 'teacher_lan';
   static const teacherNam = 'teacher_nam';
+  static const teacherEmpty = 'teacher_empty';
+  static const teacherNoClass = 'teacher_no_class';
   static const parentBinh = 'parent_binh';
   static const parentNoChild = 'parent_no_child';
   static const noProfile = 'no_profile';
   static const nullRole = 'null_role';
   static const blockedStudent = 'blocked_student';
+  static const rateLimitStudent = 'rate_limit_student';
 
   // Classes.
+  static const class6C = 'class_6c';
   static const class7A = 'class_7a';
   static const class7B = 'class_7b';
   static const class8A = 'class_8a';
@@ -73,6 +78,12 @@ const List<AccountFixture> phase1Accounts = [
     role: 'student',
   ),
   AccountFixture(
+    key: FixtureKeys.studentEmpty,
+    email: 'hs.trong@edubox.test',
+    name: 'Bùi Khánh Linh',
+    role: 'student',
+  ),
+  AccountFixture(
     key: FixtureKeys.teacherLan,
     email: 'gv.lan@edubox.test',
     name: 'Võ Thị Lan',
@@ -82,6 +93,18 @@ const List<AccountFixture> phase1Accounts = [
     key: FixtureKeys.teacherNam,
     email: 'gv.nam@edubox.test',
     name: 'Đỗ Văn Nam',
+    role: 'teacher',
+  ),
+  AccountFixture(
+    key: FixtureKeys.teacherEmpty,
+    email: 'gv.moi@edubox.test',
+    name: 'Ngô Thanh Tùng',
+    role: 'teacher',
+  ),
+  AccountFixture(
+    key: FixtureKeys.teacherNoClass,
+    email: 'gv.chua.lop@edubox.test',
+    name: 'Trịnh Mai Phương',
     role: 'teacher',
   ),
   AccountFixture(
@@ -115,9 +138,26 @@ const List<AccountFixture> phase1Accounts = [
     role: 'student',
     blocked: true,
   ),
+  // Dedicated account for the contract suite's too-many-attempts row, so the
+  // rate limiter never locks the account other E2E criteria sign in with.
+  AccountFixture(
+    key: FixtureKeys.rateLimitStudent,
+    email: 'hs.gioi.han@edubox.test',
+    name: 'Đinh Bảo Châu',
+    role: 'student',
+  ),
 ];
 
 const List<ClassFixture> phase1Classes = [
+  // Empty library: student Linh's class 6C has no approved content.
+  ClassFixture(
+    key: FixtureKeys.class6C,
+    name: '6C',
+    gradeLevel: 6,
+    teacherKey: FixtureKeys.teacherEmpty,
+    subjects: ['Toán'],
+    studentKeys: [FixtureKeys.studentEmpty],
+  ),
   ClassFixture(
     key: FixtureKeys.class7A,
     name: '7A',

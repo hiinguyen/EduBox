@@ -31,9 +31,10 @@ void main() {
 
     final restored = await store.readSession();
     expect(restored, isNotNull);
-    expect(restored!.signedInEmail, 'ph.binh@edubox.test');
-    expect(restored.role, UserRole.parent);
-    expect(restored.profile!.linkedStudentName, 'Nguyễn Minh An');
+    expect(restored!.cachedAt, isNotNull);
+    expect(restored.value.signedInEmail, 'ph.binh@edubox.test');
+    expect(restored.value.role, UserRole.parent);
+    expect(restored.value.profile!.linkedStudentName, 'Nguyễn Minh An');
   });
 
   test('a not-set-up session round-trips as notSetUp', () async {
@@ -44,8 +45,8 @@ void main() {
     await store.saveSession(fake.currentSession!);
 
     final restored = await store.readSession();
-    expect(restored!.isNotSetUp, isTrue);
-    expect(restored.signedInEmail, 'chua.co.vai.tro@edubox.test');
+    expect(restored!.value.isNotSetUp, isTrue);
+    expect(restored.value.signedInEmail, 'chua.co.vai.tro@edubox.test');
   });
 
   test('teacher classes round-trip in order, and an empty cache is distinct '
@@ -58,12 +59,17 @@ void main() {
     await store.saveTeacherClasses(classes);
 
     final restored = await store.readTeacherClasses();
-    expect(restored!.map((item) => item.name), ['7A', '7B', '8A']);
-    expect(restored.first.subjects, ['Toán', 'Ngữ văn', 'Khoa học tự nhiên']);
-    expect(restored.last.studentCount, 0);
+    expect(restored!.cachedAt, isNotNull);
+    expect(restored.value.map((item) => item.name), ['7A', '7B', '8A']);
+    expect(restored.value.first.subjects, [
+      'Toán',
+      'Ngữ văn',
+      'Khoa học tự nhiên',
+    ]);
+    expect(restored.value.last.studentCount, 0);
 
     await store.saveTeacherClasses(const []);
-    expect(await store.readTeacherClasses(), isEmpty);
+    expect((await store.readTeacherClasses())!.value, isEmpty);
 
     await store.clearAll();
     expect(await store.readTeacherClasses(), isNull);
@@ -78,8 +84,9 @@ void main() {
     await store.saveStudentLibrary(library);
 
     final restored = await store.readStudentLibrary();
-    expect(restored!.classes.single.name, '7A');
-    expect(restored.items.map((item) => item.title), [
+    expect(restored!.cachedAt, isNotNull);
+    expect(restored.value.classes.single.name, '7A');
+    expect(restored.value.items.map((item) => item.title), [
       'Từ vựng Tiếng Anh 7 - Unit 1',
       'Nội quy lớp học',
       'Tế bào và mô',
@@ -87,7 +94,7 @@ void main() {
       'Đọc hiểu văn bản tự sự',
       'Phân số và số thập phân',
     ]);
-    expect(restored.items.first.type, ContentType.ebook);
+    expect(restored.value.items.first.type, ContentType.ebook);
   });
 
   test('parent home round-trips, including a missing linked child', () async {
@@ -95,14 +102,14 @@ void main() {
       const ParentHomeData(linkedStudentName: 'Nguyễn Minh An'),
     );
     expect(
-      (await store.readParentHome())!.linkedStudentName,
+      (await store.readParentHome())!.value.linkedStudentName,
       'Nguyễn Minh An',
     );
 
     await store.saveParentHome(const ParentHomeData(linkedStudentName: null));
     final restored = await store.readParentHome();
-    expect(restored!.linkedStudentName, isNull);
-    expect(restored.hasLinkedChild, isFalse);
+    expect(restored!.value.linkedStudentName, isNull);
+    expect(restored.value.hasLinkedChild, isFalse);
   });
 
   test(

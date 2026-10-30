@@ -167,6 +167,8 @@ class TestEndpoints {
 
   late final _DiagnosticsEndpoint diagnostics;
 
+  late final _E2eEndpoint e2e;
+
   late final _ProfileEndpoint profile;
 }
 
@@ -194,6 +196,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     diagnostics = _DiagnosticsEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    e2e = _E2eEndpoint(
       endpoints,
       serializationManager,
     );
@@ -414,6 +420,56 @@ class _DiagnosticsEndpoint {
       _localTestStreamManager.outputStreamController,
     );
     return _localTestStreamManager.outputStreamController.stream;
+  }
+}
+
+class _E2eEndpoint {
+  _E2eEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<String> run(
+    _ist.TestSessionBuilder sessionBuilder, {
+    required String token,
+    required String step,
+    String? accountKey,
+    String? role,
+  }) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'e2e',
+            method: 'run',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'e2e',
+          methodName: 'run',
+          parameters: _ist.testObjectToJson({
+            'token': token,
+            'step': step,
+            'accountKey': accountKey,
+            'role': role,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<String>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
   }
 }
 

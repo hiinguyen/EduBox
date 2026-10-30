@@ -29,6 +29,11 @@ abstract interface class AuthRepository {
 }
 
 /// `profile.me`: the caller's own profile, or a typed not-set-up state.
+///
+/// All data repositories return `BackendOk.cachedAt`; a local-store read
+/// while the `NetworkController` is offline or reconnecting also sets
+/// `BackendOk.isStale`. They never dial the server when the seam is not
+/// online: they read `CachedDataStore` or fail with `OfflineNoCacheError`.
 abstract interface class ProfileRepository {
   Future<BackendResult<ProfileResult>> me();
 }

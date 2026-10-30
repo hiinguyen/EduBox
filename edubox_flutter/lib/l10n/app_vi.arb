@@ -160,7 +160,7 @@
       }
     }
   },
-  "networkOffline": "Đang ngoại tuyến. Tài liệu đã tải về vẫn mở được.",
+  "networkOffline": "Đang ngoại tuyến. Dữ liệu đã lưu vẫn hiển thị.",
   "networkOfflineStale": "Đang ngoại tuyến. Dữ liệu hiển thị có thể chưa mới nhất.",
   "networkReconnecting": "Đã kết nối lại, đang cập nhật…",
   "accountMenuTooltip": "Tài khoản",
