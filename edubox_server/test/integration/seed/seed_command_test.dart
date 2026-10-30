@@ -1,6 +1,3 @@
-@Tags(['backend-pending'])
-library;
-
 import 'dart:typed_data';
 
 import 'package:edubox_server/src/generated/protocol.dart';
@@ -13,8 +10,7 @@ import 'package:test/test.dart';
 import '../support/harness.dart';
 import '../test_tools/serverpod_test_tools.dart';
 
-/// BACKEND TRACK: implement `runSeedStep` and remove the `backend-pending`
-/// tag. These are the acceptance tests for the seed contract in
+/// The acceptance tests for the seed contract in
 /// docs/build/phase-1/contract.md sections 2.5-2.6.
 ///
 /// Each test resets the ephemeral test database, so committed rows from one
@@ -370,6 +366,44 @@ void main() {
             where: (table) => table.classId.equals(row.id!),
           )).map((subject) => subject.subject),
           reconnectDeltaClass.subjects,
+        );
+      });
+
+      test('the delta steps are idempotent', () async {
+        for (var run = 0; run < 2; run++) {
+          await runSeedStep(
+            session,
+            SeedStep.reconnectLibrary,
+            e2eStore: store,
+          );
+          await runSeedStep(
+            session,
+            SeedStep.reconnectClasses,
+            e2eStore: store,
+          );
+          await runSeedStep(session, SeedStep.assignRole, e2eStore: store);
+        }
+        expect(
+          await ContentRecord.db.count(
+            session,
+            where: (table) => table.title.equals(reconnectDeltaContent.title),
+          ),
+          1,
+        );
+        expect(
+          await SchoolClass.db.count(
+            session,
+            where: (table) => table.name.equals(reconnectDeltaClass.name),
+          ),
+          1,
+        );
+        expect(
+          await ContentRecord.db.count(session),
+          FixtureSet.phase1().content.length + 1,
+        );
+        expect(
+          await SchoolClass.db.count(session),
+          FixtureSet.phase1().classes.length + 1,
         );
       });
 
