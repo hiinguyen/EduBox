@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:edubox_server/src/generated/protocol.dart';
@@ -7,6 +8,7 @@ import 'package:serverpod/serverpod.dart';
 import 'package:serverpod_auth_idp_server/core.dart';
 import 'package:test/test.dart';
 
+import '../../../bin/seed.dart';
 import '../support/harness.dart';
 import '../test_tools/serverpod_test_tools.dart';
 
@@ -287,6 +289,46 @@ void main() {
           isNull,
         );
       });
+
+      test('runSeedCli resets this test database and exits 0', () async {
+        final database =
+            (await session.db.unsafeQuery(
+                  'SELECT current_database() AS name',
+                )).first[0]!
+                as String;
+
+        final s3 = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => s3.close(force: true));
+        final endpoint = Uri.parse('http://${s3.address.host}:${s3.port}');
+        s3.listen((request) async {
+          request.response
+            ..headers.set(HttpHeaders.contentTypeHeader, 'application/xml')
+            ..write(
+              '<?xml version="1.0" encoding="UTF-8"?>'
+              '<ListBucketResult '
+              'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+              '<Name>edubox-test</Name><Prefix></Prefix>'
+              '<KeyCount>0</KeyCount><MaxKeys>1000</MaxKeys>'
+              '<IsTruncated>false</IsTruncated>'
+              '</ListBucketResult>',
+            );
+          await request.response.close();
+        });
+
+        final exitCode = await runSeedCli(
+          const SeedArgs(runMode: 'test', step: SeedStep.reset),
+          environment: {
+            'EDUBOX_STORAGE_ENDPOINT': endpoint.toString(),
+            'EDUBOX_STORAGE_PUBLIC_ENDPOINT': endpoint.toString(),
+          },
+          configOverride: (config) => _withDatabase(config, database),
+        );
+        expect(exitCode, 0);
+        expect(await EduboxUser.db.count(session), 14);
+        expect(await SchoolClass.db.count(session), 5);
+        expect(await ContentRecord.db.count(session), 9);
+        expect(await EmailAccount.db.count(session), 15);
+      });
     },
   );
 
@@ -436,6 +478,27 @@ void main() {
       );
     },
   );
+
+  withServerpod(
+    'seed delta steps before reset',
+    (sessionBuilder, endpoints) {
+      test('a delta step before reset throws StateError', () async {
+        final session = sessionBuilder.build();
+        final store = _RecordingStore();
+        for (final step in [
+          SeedStep.reconnectLibrary,
+          SeedStep.reconnectClasses,
+          SeedStep.assignRole,
+        ]) {
+          await expectLater(
+            runSeedStep(session, step, e2eStore: store),
+            throwsA(isA<StateError>()),
+            reason: step.cliName,
+          );
+        }
+      });
+    },
+  );
 }
 
 Future<EduboxUser?> _userByEmail(Session session, String email) =>
@@ -452,6 +515,30 @@ Future<List<int>> _fixtureCounts(Session session) async => [
   await ContentRecord.db.count(session),
   await ContentClass.db.count(session),
 ];
+
+/// Points the CLI's own Serverpod at the group's ephemeral database, with a
+/// single connection so the CLI does not exhaust the test postmaster.
+ServerpodConfig _withDatabase(ServerpodConfig config, String databaseName) {
+  final database = config.database;
+  if (database is! PostgresDatabaseConfig) return config;
+  return config.copyWith(
+    // The test passwords have no serviceSecret; a valid one keeps the CLI
+    // from logging the Insights-disabled warning during the test.
+    serviceSecret: 'test-only-service-secret-0000000000',
+    database: PostgresDatabaseConfig(
+      host: database.host,
+      port: database.port,
+      user: database.user,
+      password: database.password,
+      name: databaseName,
+      requireSsl: database.requireSsl,
+      isUnixSocket: database.isUnixSocket,
+      searchPaths: database.searchPaths,
+      maxConnectionCount: 1,
+      dataPath: database.dataPath,
+    ),
+  );
+}
 
 class _RecordingStore implements ObjectStore {
   final List<String> deletedPrefixes = [];
