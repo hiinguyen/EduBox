@@ -28,7 +28,7 @@ Notes on commands:
 
 | Phase | Goal | Status | Branch | Contract tag | Gate round | Updated |
 |---|---|---|---|---|---|---|
-| 1 | Each role signs in to a Vietnamese UI and lands on its own home, also offline from the local store; student sees only approved content; a streaming server method and MinIO round trip are proven | planning | phase-1 | - | - | 2026-10-29 |
+| 1 | Each role signs in to a Vietnamese UI and lands on its own home, also offline from the local store; student sees only approved content; a streaming server method and MinIO round trip are proven | building | phase-1 | - | - | 2026-10-29 |
 | 2 | Teacher uploads and approves content; student reads, watches, and downloads it for offline use | planned | - | - | - | - |
 | 3 | Teacher assigns a lesson-linked practice exercise; student submits (online or offline through the outbox); auto-grade result shows on the teacher dashboard | planned | - | - | - | - |
 | 4 | Student chats with a streaming, scoped, rate-limited AI tutor; every exchange is logged by the server | planned | - | - | - | - |
