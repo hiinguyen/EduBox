@@ -6,6 +6,7 @@ import '../screens/app_start/app_start_screens.dart';
 import '../screens/sign_in/sign_in_screen.dart';
 import '../screens/student_library/student_library_screen.dart';
 import '../shell/student_shell.dart';
+import '../shell/teacher_shell.dart';
 import 'session_controller.dart';
 
 /// Maps the session stage (and, at home, the role) to the one screen that
@@ -28,7 +29,7 @@ class StageRouter extends StatelessWidget {
         UserRole.student => StudentShell(
           libraryBuilder: (_) => const StudentLibraryScreen(),
         ),
-        UserRole.teacher => const AppOpeningScreen(),
+        UserRole.teacher => const TeacherShell(),
         UserRole.parent => const AppOpeningScreen(),
       },
     };
