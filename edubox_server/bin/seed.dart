@@ -77,11 +77,22 @@ Future<void> main(List<String> args) async {
 
 /// Runs one seed step without starting the API server: Serverpod only loads
 /// the config and passwords and opens the database pool lazily.
+///
+/// Refuses every run mode outside [seedRunModes] and returns [seedExitUsage]
+/// without loading any config: the seed wipes every EduBox and auth table, so
+/// the gate must not depend on the caller having used [parseSeedArgs].
 Future<int> runSeedCli(
   SeedArgs args, {
   Map<String, String>? environment,
   ServerpodConfig Function(ServerpodConfig)? configOverride,
 }) async {
+  if (!seedRunModes.contains(args.runMode)) {
+    stderr.writeln(
+      'seed: refusing run mode "${args.runMode}": this command wipes every '
+      'EduBox and auth table.',
+    );
+    return seedExitUsage;
+  }
   // Serverpod's own parser drops every argument when it meets an unknown
   // one, so it only ever receives the run mode.
   final pod = Serverpod(
