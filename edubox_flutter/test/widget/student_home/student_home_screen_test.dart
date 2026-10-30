@@ -231,7 +231,10 @@ void main() {
     ];
     final built = <String>[
       vi.navHome,
-      if (find.byKey(const Key('screen.studentLibrary')).evaluate().isNotEmpty)
+      if (find
+          .byKey(const Key('screen.studentLibrary'), skipOffstage: false)
+          .evaluate()
+          .isNotEmpty)
         vi.navLibrary,
     ];
     expect(labels, built);
