@@ -1,6 +1,7 @@
 import 'package:edubox_client/edubox_client.dart' show UserRole;
 import 'package:flutter/material.dart';
 
+import '../screens/account_not_set_up/account_not_set_up_screen.dart';
 import '../screens/app_start/app_start_screens.dart';
 import '../screens/sign_in/sign_in_screen.dart';
 import 'session_controller.dart';
@@ -20,7 +21,7 @@ class StageRouter extends StatelessWidget {
       AppStage.opening => const AppOpeningScreen(),
       AppStage.startFailed => AppStartFailedScreen(onRetry: session.start),
       AppStage.signedOut => const SignInScreen(),
-      AppStage.notSetUp => const AppOpeningScreen(),
+      AppStage.notSetUp => const AccountNotSetUpScreen(),
       AppStage.home => switch (session.session!.role!) {
         UserRole.student => const AppOpeningScreen(),
         UserRole.teacher => const AppOpeningScreen(),
