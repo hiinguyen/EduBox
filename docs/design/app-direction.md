@@ -36,7 +36,7 @@ It also enforces the One Accent Rule by construction, keeps surfaces flat (Flat-
 3. **The dealt `home` pattern is adapted.**
    Its four count tiles are dropped on every home: counts of finished work are an engagement device on a student surface and say nothing a teacher acts on.
    The home keeps the pattern's greeting (student only), its 12-column column arithmetic, and its panels of row cards.
-4. **The shell "open plane" becomes a Material 3 `NavigationRail` on the paper ground** with no divider, which is the same archetype in Flutter terms (section 5).
+4. **The shell "open plane" becomes a rail on the paper ground** with no divider (Material 3 `NavigationRail` at medium and expanded widths, a custom extended rail at large widths; section 5), which is the same archetype in Flutter terms.
 5. **Index numbers appear only as data**: question numbers in an exercise or test, and the A, B, C, D of a multiple-choice option.
 
 ### 1.2 Its face and the product's own elements
@@ -328,9 +328,13 @@ Width decides the layout, never orientation; read `MediaQuery.sizeOf(context).wi
 | compact | < 600 | Phone, split screen, 8" tablet portrait in multi-window | Bottom `NavigationBar`, 3-5 destinations | 16 | One |
 | medium | 600-839 | 10-11" tablet portrait (800 x 1280 dp), 8" portrait (600 x 960) | `NavigationRail`, labels always shown, 88dp | 24 | One; list-and-detail screens push |
 | expanded | 840-1199 | 8" tablet landscape (960 x 600) | `NavigationRail`, labels shown, 88dp | 32 | Two where both panes stay at least 340dp |
-| large | >= 1200 | 10-11" tablet landscape (1280 x 800), the `edubox_tablet` AVD | `NavigationRail(extended: true)`, 240dp, mark and scope at top | 32 | Two |
+| large | >= 1200 | 10-11" tablet landscape (1280 x 800), the `edubox_tablet` AVD | an extended rail, 240dp (see note below), mark and scope at top | 32 | Two |
 
 Arithmetic for the two target sizes (write it into the shell's code comment):
+Implementation note (2026-10-30, phase 1 build): the large-class rail is a custom extended rail in `edubox_flutter/lib/src/shell/role_shell.dart`, not `NavigationRail(extended: true)`.
+Flutter's extended `NavigationRail` draws the indicator pill around the icon only, so the active label sat beside the pill; the custom rail keeps the same paper ground, 240dp width, `secondaryContainer` pill, 14 / 20 labels, semantics and 48dp rows, with the label inside the pill.
+The medium and expanded classes still use `NavigationRail`.
+
 landscape 1280 = 240 rail + 32 + 976 content + 32;
 portrait 800 = 88 rail + 24 + 664 content + 24.
 In landscape about 728dp of height remains under the status and navigation bars, so every block a screen's question needs shows its header and first rows within that height.

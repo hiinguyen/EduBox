@@ -215,6 +215,7 @@ Status values, in order: planned, shaping, contracting, planning, building, inte
 - [LOW] The literal-string scanner does not catch a literal reached through a variable (`const x = '...'; Text(x)`), `+` concatenation, or a literal method target (`'x'.toUpperCase()`), and contract.md lists only the covered forms - from contract review r3 - scheduled: phase 1 (frontend plan must forbid these forms; contract may add a `+` branch)
 - [LOW] `tool/bootstrap.sh` does not add keys newly added to `passwords.example.yaml` (e.g. `test.e2eControlToken`) to an existing `passwords.yaml`, so an older checkout fails the e2e set-role test - from contract review r3 - scheduled: phase 1
 - [LOW] The endpoint-side run-mode check in `E2eEndpoint.authorize` has no direct test with `runMode: 'production'` and a hand-built config whose `e2eControl` is true - from contract review r3 - scheduled: phase 1
+- [LOW] The custom extended rail's InkWell hover/focus/press overlay is wider than the active pill (hit target correct) - from FE task 12 re-review r2 - scheduled: next change to the rail
 
 ## Rulings and decisions
 
