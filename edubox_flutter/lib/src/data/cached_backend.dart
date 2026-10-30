@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:edubox_client/edubox_client.dart'
     show
@@ -8,7 +9,6 @@ import 'package:edubox_client/edubox_client.dart'
         ProfileStatus,
         StudentLibrary,
         UserRole;
-import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../contract/backend.dart';
 import '../contract/backend_result.dart';
@@ -104,7 +104,12 @@ class CachedBackend implements EduBoxBackend {
     } catch (error, stackTrace) {
       // A background refresh has no caller to report to; never let it become
       // an uncaught async error in the app zone.
-      debugPrint('EduBox reconnect refresh failed: $error\n$stackTrace');
+      developer.log(
+        'EduBox reconnect refresh failed',
+        name: 'EduBox.CachedBackend',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 

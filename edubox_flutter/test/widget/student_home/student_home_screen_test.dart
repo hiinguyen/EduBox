@@ -1,5 +1,8 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:edubox_fixtures/edubox_fixtures.dart';
 import 'package:edubox_flutter/src/contract/backend_result.dart';
+import 'package:edubox_flutter/src/features/library/content_row.dart';
 import 'package:edubox_flutter/src/screens/sign_in/sign_in_screen.dart';
 import 'package:edubox_flutter/src/screens/student_home/student_home_screen.dart';
 import 'package:edubox_flutter/src/shell/role_shell.dart';
@@ -174,6 +177,67 @@ void main() {
     expect(find.text('Ôn tập chương 1'), findsOneWidget);
   });
 
+  testWidgets('error after data: lastUpdatedAt hint over kept rows, retry', (
+    tester,
+  ) async {
+    final app = await pumpEduApp(tester, signedInAs: FixtureKeys.studentAn);
+    app.fake.libraryError = const UnexpectedBackendError();
+    app.network.goOffline();
+    await tester.pumpAndSettle();
+    app.network.goOnline();
+    await tester.pumpAndSettle();
+    expect(find.text(vi.studentHomeLibraryError), findsOneWidget);
+    expect(find.text(vi.lastUpdatedAt('09:14')), findsOneWidget);
+    expect(find.text('Từ vựng Tiếng Anh 7 - Unit 1'), findsOneWidget);
+    expect(find.text(vi.retry), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.clearFailures();
+    await tester.tap(find.text(vi.retry));
+    await tester.pumpAndSettle();
+    expect(find.text(vi.studentHomeLibraryError), findsNothing);
+    expect(find.text(vi.studentHomeLibraryCount(6)), findsOneWidget);
+  });
+
+  testWidgets('rows are not tappable; the nav holds only built destinations', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpEduApp(tester, signedInAs: FixtureKeys.studentAn);
+    final row = find.ancestor(
+      of: find.text('Tế bào và mô'),
+      matching: find.byType(ContentRow),
+    );
+    expect(row, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(row)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isFalse,
+    );
+    expect(
+      find.descendant(of: row, matching: find.byType(InkWell)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: row, matching: find.byType(GestureDetector)),
+      findsNothing,
+    );
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    final labels = [
+      for (final destination in rail.destinations)
+        (destination.label as Text).data,
+    ];
+    final built = <String>[
+      vi.navHome,
+      if (find.byKey(const Key('screen.studentLibrary')).evaluate().isNotEmpty)
+        vi.navLibrary,
+    ];
+    expect(labels, built);
+    semantics.dispose();
+  });
+
   testWidgets('sign-out asks first; confirm returns to sign-in', (
     tester,
   ) async {
@@ -259,6 +323,7 @@ void main() {
       signedInAs: FixtureKeys.studentAn,
     );
     expect(tester.takeException(), isNull);
+    await expectAccessibilityGuidelines(tester);
   });
 
   for (final (name, size) in [
