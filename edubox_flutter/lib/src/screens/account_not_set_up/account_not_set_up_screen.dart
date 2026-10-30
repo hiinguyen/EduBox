@@ -20,6 +20,17 @@ abstract final class AccountNotSetUpKeys {
 
 enum _Result { none, stillNotSetUp, offline, failed }
 
+/// The contact sentence with the quoted button name held on one line: each
+/// space inside the button's l10n label becomes a non-breaking space
+/// (U+00A0). The ARB is untouched, so all copy stays in l10n keys.
+String _contactLine(AppLocalizations l10n) {
+  final name = l10n.accountCheckAgain;
+  return l10n.accountNotSetUpContact.replaceFirst(
+    name,
+    name.replaceAll(' ', '\u00A0'),
+  );
+}
+
 /// `account-not-set-up` (docs/design/shapes/account-not-set-up.md).
 class AccountNotSetUpScreen extends StatefulWidget {
   const AccountNotSetUpScreen({super.key});
@@ -72,7 +83,15 @@ class _AccountNotSetUpScreenState extends State<AccountNotSetUpScreen> {
   Future<void> _signOut() async {
     setState(() => _signingOut = true);
     final error = await AppScope.of(context).session.signOut();
-    if (mounted && error != null) setState(() => _signingOut = false);
+    if (!mounted || error == null) return;
+    setState(() => _signingOut = false);
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.signOutFailed),
+        action: SnackBarAction(label: l10n.retry, onPressed: _signOut),
+      ),
+    );
   }
 
   @override
@@ -100,7 +119,7 @@ class _AccountNotSetUpScreenState extends State<AccountNotSetUpScreen> {
           const SizedBox(height: EduSpace.s12),
           Text(l10n.accountNotSetUpBody, style: text.bodyLarge),
           const SizedBox(height: EduSpace.s16),
-          Text(l10n.accountNotSetUpContact, style: text.bodyLarge),
+          Text(_contactLine(l10n), style: text.bodyLarge),
           const SizedBox(height: EduSpace.s24),
           Semantics(
             container: true,

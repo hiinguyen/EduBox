@@ -89,6 +89,8 @@ void main() {
     await tester.tap(find.byKey(AccountNotSetUpKeys.checkAgain));
     await tester.pumpAndSettle();
     expect(find.byKey(AccountNotSetUpKeys.screen), findsNothing);
+    expect(find.byKey(const Key('screen.studentHome')), findsOneWidget);
+    expect(find.byKey(SignInKeys.screen), findsNothing);
   });
 
   testWidgets('expired session on check again routes to sign-in', (
@@ -108,6 +110,38 @@ void main() {
     expect(find.byKey(SignInKeys.screen), findsOneWidget);
   });
 
+  testWidgets('signing out: busy label, check-again disabled', (tester) async {
+    final app = await pumpEduApp(tester, signedInAs: FixtureKeys.noProfile);
+    app.fake.holdCalls();
+    await tester.tap(find.byKey(AccountNotSetUpKeys.signOut));
+    await tester.pump();
+    expect(find.text(vi.signOutBusy), findsOneWidget);
+    final checkAgain = tester.widget<OutlinedButton>(
+      find.byKey(AccountNotSetUpKeys.checkAgain),
+    );
+    expect(checkAgain.onPressed, isNull);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.releaseCalls();
+    await tester.pumpAndSettle();
+    expect(find.byKey(SignInKeys.screen), findsOneWidget);
+  });
+
+  testWidgets('sign-out failure: snackbar with retry, screen stays', (
+    tester,
+  ) async {
+    final app = await pumpEduApp(tester, signedInAs: FixtureKeys.noProfile);
+    app.fake.signOutError = const UnexpectedBackendError();
+    await tester.tap(find.byKey(AccountNotSetUpKeys.signOut));
+    await tester.pumpAndSettle();
+    expect(find.text(vi.signOutFailed), findsOneWidget);
+    expect(find.byKey(AccountNotSetUpKeys.screen), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.signOutError = null;
+    await tester.tap(find.text(vi.retry));
+    await tester.pumpAndSettle();
+    expect(find.byKey(SignInKeys.screen), findsOneWidget);
+  });
+
   testWidgets('200% text on a phone scrolls without overflow', (tester) async {
     await pumpEduApp(
       tester,
@@ -116,6 +150,27 @@ void main() {
       signedInAs: FixtureKeys.nullRole,
     );
     expect(tester.takeException(), isNull);
+    for (final key in [
+      AccountNotSetUpKeys.checkAgain,
+      AccountNotSetUpKeys.signOut,
+    ]) {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.pumpAndSettle();
+      expect(find.byKey(key).hitTestable(), findsOneWidget);
+    }
+    await expectAccessibilityGuidelines(tester);
+  });
+
+  testWidgets('contact line keeps the button name on one line', (
+    tester,
+  ) async {
+    await pumpEduApp(tester, signedInAs: FixtureKeys.nullRole);
+    final name = vi.accountCheckAgain.replaceAll(' ', '\u00A0');
+    final contact = vi.accountNotSetUpContact.replaceFirst(
+      vi.accountCheckAgain,
+      name,
+    );
+    expect(find.text(contact), findsOneWidget);
   });
 
   for (final (name, size) in [
