@@ -28,7 +28,7 @@ Notes on commands:
 
 | Phase | Goal | Status | Branch | Contract tag | Gate round | Updated |
 |---|---|---|---|---|---|---|
-| 1 | Each role signs in to a Vietnamese UI and lands on its own home, also offline from the local store; student sees only approved content; a streaming server method and MinIO round trip are proven | contracting | phase-1 | - | - | 2026-10-29 |
+| 1 | Each role signs in to a Vietnamese UI and lands on its own home, also offline from the local store; student sees only approved content; a streaming server method and MinIO round trip are proven | planning | phase-1 | - | - | 2026-10-29 |
 | 2 | Teacher uploads and approves content; student reads, watches, and downloads it for offline use | planned | - | - | - | - |
 | 3 | Teacher assigns a lesson-linked practice exercise; student submits (online or offline through the outbox); auto-grade result shows on the teacher dashboard | planned | - | - | - | - |
 | 4 | Student chats with a streaming, scoped, rate-limited AI tutor; every exchange is logged by the server | planned | - | - | - | - |
@@ -212,6 +212,9 @@ Status values, in order: planned, shaping, contracting, planning, building, inte
 ## Carried items
 
 - [LOW] The six phase 1 shape briefs in `docs/design/shapes/` still use Firestore, `isFromCache`, realtime-listener, custom-claim, and Firebase error-code wording below their top note; the note at the top of each brief (backend changed 2026-10-29) already tells readers to map those to the local store, outbox, server-stored role, and contract error shapes. The phase 1 contract must also map or drop `signInTooManyAttempts` and `signInAccountDisabled`, which named Firebase codes with no Serverpod equivalent yet - from roadmap r2 - scheduled: phase 1
+- [LOW] The literal-string scanner does not catch a literal reached through a variable (`const x = '...'; Text(x)`), `+` concatenation, or a literal method target (`'x'.toUpperCase()`), and contract.md lists only the covered forms - from contract review r3 - scheduled: phase 1 (frontend plan must forbid these forms; contract may add a `+` branch)
+- [LOW] `tool/bootstrap.sh` does not add keys newly added to `passwords.example.yaml` (e.g. `test.e2eControlToken`) to an existing `passwords.yaml`, so an older checkout fails the e2e set-role test - from contract review r3 - scheduled: phase 1
+- [LOW] The endpoint-side run-mode check in `E2eEndpoint.authorize` has no direct test with `runMode: 'production'` and a hand-built config whose `e2eControl` is true - from contract review r3 - scheduled: phase 1
 
 ## Rulings and decisions
 
