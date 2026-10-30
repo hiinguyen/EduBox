@@ -164,11 +164,22 @@ class S3ObjectStore implements ObjectStore {
       throw ArgumentError.value(prefix, 'prefix', 'Must not start with "/"');
     }
     // Every listed key is deleted before the next listing, so the first page
-    // is always the next batch; no continuation token is needed.
+    // is always the next batch; no continuation token is needed. A listing
+    // that returns a key deleted in an earlier round made no progress (for
+    // example an eventually consistent backend), so fail instead of looping
+    // forever or reporting success.
+    final deletedKeys = <String>{};
     while (true) {
       final page = await _listFirstPage(prefix);
+      if (page.keys.any(deletedKeys.contains)) {
+        throw StateError(
+          'deletePrefix("$prefix") made no progress: the listing still '
+          'returns an object that was already deleted',
+        );
+      }
       for (final key in page.keys) {
         final response = await _client.deleteObject(key);
+        deletedKeys.add(key);
         if (response.statusCode == 404) continue;
         _client.checkResponseError(response);
       }
