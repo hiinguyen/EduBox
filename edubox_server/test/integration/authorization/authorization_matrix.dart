@@ -82,12 +82,15 @@ final Map<String, MethodRule> eduboxMethodMatrix = {
 };
 
 /// Test-only HTTP/endpoint surface that is not role-gated but is guarded by
-/// the e2e control token and exists only when `edubox.e2eControl` is true.
-/// `test/integration/e2e/e2e_control_test.dart` proves both states.
+/// the e2e control token and exists only in the `development` (compose e2e)
+/// and `test` run modes when `edubox.e2eControl` is true. `production`,
+/// `staging` and every other mode reject it. `test/integration/e2e/`
+/// `e2e_control_test.dart` proves the allowed and denied states.
 const Map<String, String> tokenGuardedE2eMethods = {
   'e2e.run':
-      'Disabled unless edubox.e2eControl/EDUBOX_E2E_CONTROL=true; every call '
-      'requires the e2eControlToken password.',
+      'Allowed only in the development/test run modes with '
+      'edubox.e2eControl/EDUBOX_E2E_CONTROL=true; every call requires the '
+      'e2eControlToken password. Production and staging always deny.',
 };
 
 /// Auth-module methods a caller may use without a session, each with the

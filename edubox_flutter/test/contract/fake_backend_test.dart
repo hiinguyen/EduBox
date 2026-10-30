@@ -1,3 +1,4 @@
+import 'package:edubox_client/edubox_client.dart';
 import 'package:edubox_flutter/src/contract/backend_result.dart';
 import 'package:edubox_flutter/src/contract/network_controller.dart';
 import 'package:edubox_flutter/src/fake/fake_backend.dart';
@@ -273,6 +274,73 @@ void main() {
       await gate.future;
       expect((await pending).isOk, isTrue);
       await fake.dispose();
+    });
+
+    test(
+      'offline reads serve the last online snapshot, not live fixture deltas',
+      () async {
+        final network = ManualNetworkController();
+        final fake = FakeBackend(network: network);
+        await fake.auth.signIn(
+          email: 'hs.an@edubox.test',
+          password: devPassword,
+        );
+        final online = await fake.library.library();
+        final onlineTitles = online.valueOrNull!.items
+            .map((item) => item.title)
+            .toList();
+
+        network.goOffline();
+        fake.applyReconnectDeltas();
+        final cached = await fake.library.library();
+        expect(
+          cached.valueOrNull!.items.map((item) => item.title).toList(),
+          onlineTitles,
+        );
+        expect(
+          cached.valueOrNull!.items.map((item) => item.title),
+          isNot(contains('Ôn tập chương 1')),
+        );
+        expect(cached.isStale, isTrue);
+
+        network.goOnline();
+        final refreshed = await fake.library.library();
+        expect(
+          refreshed.valueOrNull!.items.length,
+          onlineTitles.length + 1,
+        );
+        await fake.dispose();
+        network.dispose();
+      },
+    );
+
+    test('offline profile and session keep the online role snapshot', () async {
+      final network = ManualNetworkController();
+      final fake = FakeBackend(network: network);
+      final signedIn = await fake.auth.signIn(
+        email: 'chua.co.vai.tro@edubox.test',
+        password: devPassword,
+      );
+      expect(signedIn.valueOrNull!.isNotSetUp, isTrue);
+
+      network.goOffline();
+      fake.setRole(FixtureKeys.nullRole, 'student');
+      expect(
+        (await fake.profile.me()).valueOrNull!.status,
+        ProfileStatus.notSetUp,
+      );
+      expect(
+        (await fake.auth.restoreSession()).valueOrNull!.isNotSetUp,
+        isTrue,
+      );
+
+      network.goOnline();
+      expect(
+        (await fake.profile.me()).valueOrNull!.status,
+        ProfileStatus.ready,
+      );
+      await fake.dispose();
+      network.dispose();
     });
   });
 }

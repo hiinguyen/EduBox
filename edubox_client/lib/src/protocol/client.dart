@@ -180,10 +180,13 @@ class EndpointDiagnostics extends EndpointEdubox {
 /// server-side state mid-run (exit criterion 7 and the account-not-set-up
 /// check-again case).
 ///
-/// It is disabled unless the run-mode config has `edubox.e2eControl: true` or
-/// `EDUBOX_E2E_CONTROL=true`, and it always requires the
-/// `e2eControlToken` password. The contract is in
-/// docs/build/phase-1/contract.md section 2.8.
+/// It exists only in the run modes the contract allows (the compose e2e
+/// server's `development` mode and Serverpod's `test` mode), only when that
+/// mode sets `edubox.e2eControl: true` or `EDUBOX_E2E_CONTROL=true`, and it
+/// always requires the `e2eControlToken` password. `production`, `staging` and
+/// every other run mode reject it even with the environment override and the
+/// correct token. The contract is in docs/build/phase-1/contract.md section
+/// 2.8.
 /// {@category Endpoint}
 class EndpointE2e extends _isc.EndpointRef {
   EndpointE2e(_isc.EndpointCaller caller) : super(caller);

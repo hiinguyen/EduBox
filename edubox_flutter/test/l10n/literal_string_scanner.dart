@@ -1,5 +1,6 @@
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 
@@ -144,16 +145,39 @@ class _LiteralVisitor extends RecursiveAstVisitor<void> {
     for (final argument in arguments) {
       if (argument is NamedArgument) {
         final name = argument.name.lexeme;
-        if ((_userFacingNames.contains(name) ||
-                constructorSlots.contains(name)) &&
-            _isStringLiteral(argument.argumentExpression)) {
-          _report(argument.argumentExpression, '$constructor.$name');
+        if (_userFacingNames.contains(name) ||
+            constructorSlots.contains(name)) {
+          for (final literal in _literalOperands(
+            argument.argumentExpression,
+          )) {
+            _report(literal, '$constructor.$name');
+          }
         }
       } else if (_positionalTextConstructors.contains(constructor) &&
-          argument is Expression &&
-          _isStringLiteral(argument)) {
-        _report(argument, '$constructor(...)');
+          argument is Expression) {
+        for (final literal in _literalOperands(argument)) {
+          _report(literal, '$constructor(...)');
+        }
       }
+    }
+  }
+
+  /// Unwraps expressions that can contain a hardcoded string: parentheses,
+  /// `condition ? 'a' : 'b'`, `'a' ?? 'b'`, and casts.
+  static Iterable<Expression> _literalOperands(Expression expression) sync* {
+    if (expression is ParenthesizedExpression) {
+      yield* _literalOperands(expression.expression);
+    } else if (expression is ConditionalExpression) {
+      yield* _literalOperands(expression.thenExpression);
+      yield* _literalOperands(expression.elseExpression);
+    } else if (expression is BinaryExpression &&
+        expression.operator.type == TokenType.QUESTION_QUESTION) {
+      yield* _literalOperands(expression.leftOperand);
+      yield* _literalOperands(expression.rightOperand);
+    } else if (expression is AsExpression) {
+      yield* _literalOperands(expression.expression);
+    } else if (_isStringLiteral(expression)) {
+      yield expression;
     }
   }
 

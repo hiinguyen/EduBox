@@ -66,7 +66,9 @@ class FakeBackend implements EduBoxBackend {
 
   final Map<String, String?> _roleOverrides = {};
   final Map<String, int> _failedSignIns = {};
+  final Map<String, Object?> _snapshots = {};
   AccountFixture? _signedInAccount;
+  AuthSession? _sessionSnapshot;
   DateTime? _lastRefreshAt;
   Completer<void>? _gate;
 
@@ -103,6 +105,7 @@ class FakeBackend implements EduBoxBackend {
   AuthSession signInAs(String accountKey) {
     _signedInAccount = fixtures.account(accountKey);
     _lastRefreshAt = _clock().toUtc();
+    _snapshotHomes();
     return currentSession!;
   }
 
@@ -120,6 +123,7 @@ class FakeBackend implements EduBoxBackend {
   void clearCache() {
     hasCache = false;
     _lastRefreshAt = null;
+    _snapshots.clear();
   }
 
   /// Keeps every later call pending until [releaseCalls].
@@ -174,19 +178,42 @@ class FakeBackend implements EduBoxBackend {
 
   DateTime _touchRefresh() => _lastRefreshAt = _clock().toUtc();
 
-  BackendResult<T> _dataResult<T>(T Function() build) {
+  /// Snapshots every role-home value at an online read (sign-in prefetches all
+  /// four, like a session that had loaded its home before going offline).
+  void _snapshotHomes() {
+    final account = _signedInAccount;
+    if (account == null) return;
+    final session = AuthSession(
+      signedInEmail: account.email,
+      profileResult: _profileOf(account),
+    );
+    _sessionSnapshot = session;
+    _snapshots['profile'] = session.profileResult;
+    _snapshots['classes'] = _teacherClasses();
+    _snapshots['library'] = _studentLibrary();
+    _snapshots['parent'] = _parentHome();
+  }
+
+  BackendResult<T> _dataResult<T>(String key, T Function() build) {
     if (!isOnline) {
       if (!hasCache) return BackendFailure<T>(const OfflineNoCacheError());
+      final snapshot = _snapshots[key];
+      if (snapshot is! T) {
+        return BackendFailure<T>(const OfflineNoCacheError());
+      }
       return BackendOk<T>(
-        build(),
+        snapshot,
         cachedAt: lastRefreshAt,
         isStale: true,
       );
     }
-    return BackendOk<T>(build(), cachedAt: _touchRefresh());
+    final value = build();
+    _snapshots[key] = value;
+    return BackendOk<T>(value, cachedAt: _touchRefresh());
   }
 
   AuthSession? _sessionForCall() {
+    if (!isOnline) return _sessionSnapshot;
     final account = _signedInAccount;
     if (account == null) return null;
     return AuthSession(
@@ -310,6 +337,7 @@ class _FakeAuth implements AuthRepository {
     fake._failedSignIns.remove(normalized);
     fake._signedInAccount = account;
     fake._touchRefresh();
+    fake._snapshotHomes();
     return BackendOk(
       fake.currentSession!,
       cachedAt: fake.lastRefreshAt,
@@ -322,8 +350,9 @@ class _FakeAuth implements AuthRepository {
     if (fake.restoreError != null) {
       return BackendFailure(fake.restoreError!);
     }
-    final session = fake.currentSession;
+    final session = fake.isOnline ? fake.currentSession : fake._sessionSnapshot;
     if (session == null) return const BackendOk(null);
+    if (fake.isOnline) fake._sessionSnapshot = session;
     return BackendOk(
       session,
       cachedAt: fake.lastRefreshAt,
@@ -343,9 +372,11 @@ class _FakeAuth implements AuthRepository {
     if (fake._signedInAccount == null) {
       return const BackendFailure(SessionExpiredError());
     }
+    fake._touchRefresh();
+    fake._snapshotHomes();
     return BackendOk(
       fake.currentSession!,
-      cachedAt: fake._touchRefresh(),
+      cachedAt: fake.lastRefreshAt,
     );
   }
 
@@ -358,6 +389,8 @@ class _FakeAuth implements AuthRepository {
     // Sign-out clears the local session even offline; the server call is
     // best effort.
     fake._signedInAccount = null;
+    fake._sessionSnapshot = null;
+    fake._snapshots.clear();
     return const BackendOk(null);
   }
 }
@@ -377,7 +410,7 @@ class _FakeProfile implements ProfileRepository {
     if (session == null) {
       return const BackendFailure(SessionExpiredError());
     }
-    return fake._dataResult(() => session.profileResult);
+    return fake._dataResult('profile', () => session.profileResult);
   }
 }
 
@@ -394,7 +427,7 @@ class _FakeClasses implements ClassesRepository {
     }
     final denial = fake._roleFailure(UserRole.teacher);
     if (denial != null) return BackendFailure(denial);
-    return fake._dataResult(fake._teacherClasses);
+    return fake._dataResult('classes', fake._teacherClasses);
   }
 }
 
@@ -411,7 +444,7 @@ class _FakeLibrary implements LibraryRepository {
     }
     final denial = fake._roleFailure(UserRole.student);
     if (denial != null) return BackendFailure(denial);
-    return fake._dataResult(fake._studentLibrary);
+    return fake._dataResult('library', fake._studentLibrary);
   }
 }
 
@@ -428,7 +461,7 @@ class _FakeParent implements ParentRepository {
     }
     final denial = fake._roleFailure(UserRole.parent);
     if (denial != null) return BackendFailure(denial);
-    return fake._dataResult(fake._parentHome);
+    return fake._dataResult('parent', fake._parentHome);
   }
 }
 

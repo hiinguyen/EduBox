@@ -34,15 +34,18 @@ void main() {
   });
 
   test(
-    'the scanner catches every widget-call form, including interpolation',
+    'the scanner catches every widget-call form, including nested expressions',
     () {
       const source = r'''
 import 'package:flutter/material.dart';
 
-void plant(BuildContext context) {
+void plant(BuildContext context, bool isOn, String? name) {
   Text('Xin chào');
   const Text('Xin chào');
   const Text('Chào $name');
+  Text(isOn ? 'Bật' : 'Tắt');
+  Text((isOn ? 'Bật' : null) ?? 'Tắt');
+  Text(('Chào' as String));
   Semantics(
     label: 'Nhãn',
     hint: 'Gợi ý',
@@ -60,18 +63,54 @@ void plant(BuildContext context) {
         path: 'lib/planted.dart',
         content: source,
       );
-      final slots = violations.map((violation) => violation.slot).toList();
-      expect(slots, contains('Text(...)'));
-      expect(slots, contains('Semantics.label'));
-      expect(slots, contains('Semantics.hint'));
-      expect(slots, contains('Tooltip.message'));
-      expect(slots, contains('InputDecoration.labelText'));
-      expect(slots, contains('InputDecoration.errorText'));
-      expect(slots, contains('SnackBarAction.label'));
-      expect(slots, contains('TextSpan.text'));
-      expect(slots, contains('SelectableText(...)'));
-      // The interpolated `Chào $name` and the nested literal `Con` too.
-      expect(violations.length, greaterThanOrEqualTo(12));
+      expect(
+        violations.map((violation) => violation.slot).toList(),
+        [
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Text(...)',
+          'Semantics.label',
+          'Semantics.hint',
+          'Tooltip.message',
+          'Text(...)',
+          'InputDecoration.labelText',
+          'InputDecoration.errorText',
+          'Text(...)',
+          'SnackBarAction.label',
+          'Text(...)',
+          'TextSpan.text',
+          'SelectableText(...)',
+        ],
+      );
+      expect(
+        violations.map((violation) => '${violation.line}:${violation.column}'),
+        [
+          '4:8',
+          '5:14',
+          '6:14',
+          '7:15',
+          '7:23',
+          '8:16',
+          '8:33',
+          '9:9',
+          '11:12',
+          '12:11',
+          '13:29',
+          '13:48',
+          '15:30',
+          '15:50',
+          '16:26',
+          '16:67',
+          '17:22',
+          '18:18',
+          '19:18',
+        ],
+      );
     },
   );
 

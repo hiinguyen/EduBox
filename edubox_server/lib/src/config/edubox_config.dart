@@ -14,10 +14,17 @@ class EduboxConfig {
   /// Object storage settings (MinIO locally).
   final StorageConfig storage;
 
-  /// True only for the compose `e2e` server: enables the e2e control route
-  /// (see docs/build/phase-1/contract.md). False in every committed run-mode
-  /// file.
+  /// True only for the compose `e2e` server (the `development` run mode) and
+  /// the `test` run mode: enables the e2e control route (see
+  /// docs/build/phase-1/contract.md). Any other run mode, including
+  /// `production` and `staging`, always resolves this to false even when the
+  /// file or `EDUBOX_E2E_CONTROL` asks for true.
   final bool e2eControl;
+
+  /// Run modes in which the e2e control route may be enabled. The compose
+  /// `e2e` server runs the `development` mode; Serverpod test tools run
+  /// `test`. Everything else is rejected.
+  static const Set<String> e2eControlRunModes = {'development', 'test'};
 
   /// Loads the config for [runMode] from [serverDirectory]/config.
   static EduboxConfig load({
@@ -45,6 +52,9 @@ class EduboxConfig {
     final storageMap = storage is YamlMap ? storage : null;
     final e2eOverride = env['EDUBOX_E2E_CONTROL'];
     final e2eValue = section is YamlMap ? section['e2eControl'] : null;
+    final e2eConfigured = e2eOverride != null
+        ? e2eOverride == 'true'
+        : e2eValue == true;
     return EduboxConfig(
       storage: StorageConfig(
         endpoint: Uri.parse(
@@ -56,9 +66,9 @@ class EduboxConfig {
         bucket: read(storageMap, 'bucket', 'EDUBOX_STORAGE_BUCKET'),
         region: read(storageMap, 'region', 'EDUBOX_STORAGE_REGION'),
       ),
-      e2eControl: e2eOverride != null
-          ? e2eOverride == 'true'
-          : e2eValue == true,
+      // The run-mode gate comes first: an environment override can enable
+      // the route in development/test, but never in production/staging.
+      e2eControl: e2eControlRunModes.contains(runMode) && e2eConfigured,
     );
   }
 }

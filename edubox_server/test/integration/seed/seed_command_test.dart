@@ -207,11 +207,89 @@ void main() {
         );
       });
 
-      test('a reset is idempotent and empties the e2e bucket', () async {
+      test('a reset removes rows created after seeding and restores the '
+          'fixture state', () async {
+        final fixtures = FixtureSet.phase1();
         final countsBefore = await _fixtureCounts(session);
+        final authUsersBefore = await AuthUser.db.count(session);
+        final emailAccountsBefore = await EmailAccount.db.count(session);
+
+        await runSeedStep(
+          session,
+          SeedStep.reconnectLibrary,
+          e2eStore: store,
+        );
+        await runSeedStep(
+          session,
+          SeedStep.reconnectClasses,
+          e2eStore: store,
+        );
+        await runSeedStep(session, SeedStep.assignRole, e2eStore: store);
+        expect(
+          await ContentRecord.db.findFirstRow(
+            session,
+            where: (table) => table.title.equals(reconnectDeltaContent.title),
+          ),
+          isNotNull,
+        );
+        expect(
+          await SchoolClass.db.findFirstRow(
+            session,
+            where: (table) => table.name.equals(reconnectDeltaClass.name),
+          ),
+          isNotNull,
+        );
+        expect(
+          (await _userByEmail(
+            session,
+            fixtures.account(FixtureKeys.nullRole).email,
+          ))!.role,
+          'student',
+        );
+
+        final strayAuthUser = await AuthUser.db.insertRow(
+          session,
+          AuthUser(scopeNames: const <String>{}),
+        );
+        await EmailAccount.db.insertRow(
+          session,
+          EmailAccount(
+            authUserId: strayAuthUser.id!,
+            email: 'stray.reset@edubox.test',
+            passwordHash: 'test-only-not-a-real-hash',
+          ),
+        );
+        expect(await AuthUser.db.count(session), authUsersBefore + 1);
+        expect(await EmailAccount.db.count(session), emailAccountsBefore + 1);
+
+        store.deletedPrefixes.clear();
         await runSeedStep(session, SeedStep.reset, e2eStore: store);
+
         expect(await _fixtureCounts(session), countsBefore);
+        expect(await AuthUser.db.count(session), authUsersBefore);
+        expect(await EmailAccount.db.count(session), emailAccountsBefore);
         expect(store.deletedPrefixes, contains(''));
+        expect(
+          await ContentRecord.db.findFirstRow(
+            session,
+            where: (table) => table.title.equals(reconnectDeltaContent.title),
+          ),
+          isNull,
+        );
+        expect(
+          await SchoolClass.db.findFirstRow(
+            session,
+            where: (table) => table.name.equals(reconnectDeltaClass.name),
+          ),
+          isNull,
+        );
+        expect(
+          (await _userByEmail(
+            session,
+            fixtures.account(FixtureKeys.nullRole).email,
+          ))!.role,
+          isNull,
+        );
       });
     },
   );

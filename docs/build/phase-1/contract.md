@@ -108,7 +108,9 @@ one of those classes, newest first. Draft content, another class's content and
 another teacher's class are never joined into the result.
 
 `e2e.run` is the test-only control route (section 2.8); it is not a user
-endpoint and is disabled everywhere except the compose `e2e` server.
+endpoint and exists only in the compose e2e (`development`) and `test` run
+modes, with the run-mode gate rejecting `production`, `staging` and every other
+mode regardless of config, environment variables or token.
 
 ### 2.3 Authorization guard and matrix
 
@@ -136,8 +138,10 @@ checked by `authorization_matrix_test.dart`:
   `.signOutDevice`, `.signOutAllDevices`, each with a test.
 - `frameworkUnauthenticatedExceptions`: the three Serverpod
   `serverpod_cloud_storage` raw routes, each tested over real HTTP.
-- `tokenGuardedE2eMethods`: `e2e.run`, disabled unless `e2eControl` is true
-  and always requiring the token; both states are tested.
+- `tokenGuardedE2eMethods`: `e2e.run`, allowed only in the `development`
+  (compose e2e) and `test` run modes, enabled there only when `e2eControl` is
+  true, and always requiring the token; the enabled, disabled, wrong-token and
+  production-rejection states are tested.
 - `moduleDeniedUnauthenticated`: `serverpod_auth_core.userProfileInfo.get`.
 
 The check reads the live dispatch table, so a generated endpoint method that
@@ -310,8 +314,9 @@ non-role-gated EduBox endpoint.
 
 | Property | Rule |
 | --- | --- |
-| Enablement | Only when `edubox.e2eControl: true` in `config/<runMode>.yaml` or `EDUBOX_E2E_CONTROL=true`. Both committed run modes set `false`; the compose `server` sets the env override. |
-| Token | Required `token` argument, compared with `e2eControlToken` from the run-mode `config/passwords.yaml` section. The example value is dev-only. |
+| Run mode | Allowed only in `development` (the compose e2e server's mode) and `test` (Serverpod test tools). `production`, `staging` and every other run mode always deny, even when `EDUBOX_E2E_CONTROL=true` and the token matches. |
+| Enablement | Inside an allowed run mode, only when `edubox.e2eControl: true` in `config/<runMode>.yaml` or `EDUBOX_E2E_CONTROL=true`. The committed `development.yaml` sets `false`; the compose `server` sets the env override; `test.yaml` sets `true` for the integration tests. |
+| Token | Required `token` argument, compared with `e2eControlToken` from the run-mode `config/passwords.yaml` section. The example value is dev-only; the test token is test-only. |
 | Disabled / bad token | `AccessDeniedException(reason: wrongRole)`; no state changes. |
 | Return | `ok:<step>`. |
 
@@ -324,8 +329,9 @@ phase 1 fixtures, exactly like the seed CLI.
 The authorization matrix lists `e2e.run` under `tokenGuardedE2eMethods`.
 `test/integration/e2e/e2e_control_test.dart` proves that an enabled route
 performs `set-role`/`clear-role`, that a wrong token is rejected, that a
-disabled route rejects even the correct token, and that the committed run modes
-leave it off. The compose `server` command passes `--mode development
+disabled switch rejects the correct token, and that a `production` run mode
+still rejects the route with `e2eControl: true`, the environment override and
+the correct token. The compose `server` command passes `--mode development
 --apply-migrations`; the image's exec-form entrypoint appends those arguments
 (see section 2.9).
 
@@ -438,8 +444,10 @@ calls the server, saves the snapshot and returns `isStale: false`; offline or
 reconnecting it returns the snapshot with `isStale: true` or
 `OfflineNoCacheError`, and it never dials the server. On the
 `offline|reconnecting -> online` transition it refreshes `profile.me` and the
-signed-in role home, saves the new snapshots and notifies its listeners;
-screens re-read then and never refresh from their own timer.
+signed-in role home and saves the new snapshots. Screens listen to
+`NetworkController` and re-read when it reports `online`; they never refresh
+from their own timer. The frozen `EduBoxBackend` seam does not expose a second
+change stream.
 
 ### 3.5 Network seam
 
@@ -464,9 +472,12 @@ server:
 - Offline is driven by `NetworkController`, not a second switch:
   `FakeBackend(network: ...)`; `mode` is a compatibility view over that.
   `FakeMode.online`: normal fixture answers.
-- Offline/reconnecting with `hasCache: true`: role homes still return their
-  fixture-backed data as `BackendOk(cachedAt: ..., isStale: true)`; sign-in and
-  ping are `backendUnreachable` (sign-in needs the server).
+- Offline/reconnecting with `hasCache: true`: role homes still return the
+  snapshot captured at the last online read (sign-in prefetches all four) as
+  `BackendOk(cachedAt: ..., isStale: true)`; sign-in and ping are
+  `backendUnreachable` (sign-in needs the server). Fixture deltas from
+  `applyReconnectDeltas()` and role changes from `setRole()` made while
+  offline appear only on the next online read, never in the stale snapshot.
 - Offline/reconnecting with `hasCache: false`: `profile.me`, classes, library
   and parent home return `OfflineNoCacheError`; ping throws
   `BackendException(BackendUnreachableError)`.
@@ -485,7 +496,10 @@ server:
 ### 3.7 Contract tests and the real-server seam
 
 - `edubox_flutter/test/contract/contract_suite.dart` defines
-  `runBackendContractTests({name, createBackend, ...})`.
+  `runBackendContractTests({name, createBackend, ...})`. Real-server callers
+  pass `resetState`; the suite awaits it in `setUpAll`, so each run starts from
+  the seeded fixtures and the rate-limit cases do not accumulate on a
+  long-lived server.
 - It covers the whole error-mapping table that a backend can observe: wrong
   credentials, blocked account, too many attempts on the dedicated
   `rate_limit_student` account, not-set-up callers on every role method,
@@ -498,11 +512,12 @@ server:
 - `backend_contract_test.dart` runs it against `FakeBackend` now.
 - Phase 5 adds `server_backend_contract_test.dart` that imports the same
   function and passes the generated-client implementation of `EduBoxBackend`
-  (wrapped in the cache/network data layer), plus the e2e-control `setRole`
-  hook and a closed-port factory. It runs on the AVD as an
-  `integration_test` (host `flutter test` has no secure-storage plugin), after
-  `e2e.run(step: 'reset')` has seeded the stack; the suite must not rely on
-  host-only state. No screen or contract test changes when that happens.
+  (wrapped in the cache/network data layer), the e2e-control `setRole` hook,
+  `resetState: () => e2e.run(step: 'reset')`, and a closed-port factory. It
+  runs on the AVD as an `integration_test` (host `flutter test` has no
+  secure-storage plugin), after the reset has seeded the stack; the suite must
+  not rely on host-only state. No screen or contract test changes when that
+  happens.
 - Fake-specific failure/offline tests are in `fake_backend_test.dart`; drift
   round-trip and outbox tests are in `test/local/local_store_test.dart`.
 
@@ -635,11 +650,14 @@ slot: any widget or constructor argument named `Text` positional, `label`,
 `title`, `value`, `text`, `data` or `content`, plus the constructor-specific
 slots in `test/l10n/literal_string_scanner.dart`. It visits both
 `InstanceCreationExpression` (`const Text(...)`) and `MethodInvocation`
-(`Text(...)`). The scanner has a self-test that must report a planted literal
-and pass an l10n lookup, and `allowlistedLiterals` is the documented, empty
-default allowlist for non-copy values (keys and asset paths are not text slots;
-test-only code is outside `lib/`). E2E assertions must use
-`lookupAppLocalizations(Locale('vi'))`, never literal text.
+(`Text(...)`), and it unwraps parenthesized expressions, conditionals
+(`Text(isOn ? 'Bật' : 'Tắt')`), `??`, and `as` casts, so a literal nested in
+those forms is still reported. The scanner has a self-test that asserts the
+exact violation list for every form and passes an l10n lookup, and
+`allowlistedLiterals` is the documented, empty default allowlist for non-copy
+values (keys and asset paths are not text slots; test-only code is outside
+`lib/`). E2E assertions must use `lookupAppLocalizations(Locale('vi'))`, never
+literal text.
 
 ## 4. CI
 
@@ -649,10 +667,12 @@ test-only code is outside `lib/`). E2E assertions must use
 Server job:
 
 - PostgreSQL 16 service on `localhost:9090` with the test database/password
-  from `passwords.example.yaml`, and the `pgsty/minio` service on
-  `localhost:9000`; a step creates and privatizes the `edubox-test` bucket with
-  the pinned `pgsty/mc` image, so un-skipping the storage test needs no CI
-  change.
+  from `passwords.example.yaml`. MinIO is started in a step (GitHub Actions
+  service containers cannot pass a command, and the `pgsty/minio` image's
+  default command only prints help): `docker run -d --network host ... server
+  /data`, wait for `/minio/health/ready`, then create and privatize the
+  `edubox-test` bucket with the pinned `pgsty/mc` image, so un-skipping the
+  storage test needs no CI change.
 - `dart pub global activate serverpod_cli 4.0.4`, `dart pub get`,
   `bash tool/bootstrap.sh`.
 - `dart test` in `edubox_fixtures`.
@@ -662,6 +682,9 @@ Server job:
   `dart analyze --fatal-infos`.
 - `dart test --coverage=coverage`, `coverage:format_coverage`, then
   `dart run tool/coverage_gate.dart edubox_server/coverage/lcov.info`.
+- Build the server image and start it in `development` mode against
+  `postgres_test` and the test bucket, then wait for `/readyz`; this catches an
+  entrypoint/CMD regression without the AVD.
 - Pub cache is cached by `pubspec.lock`.
 
 App job:
@@ -771,10 +794,10 @@ seams are changed only through a contract change.
 
 | Owner | Paths | Notes |
 | --- | --- | --- |
-| Contract (frozen) | `edubox_server/lib/src/models/**`, `migrations/**`, `lib/src/authz/**`, `lib/src/profile/**`, `lib/src/classes/**`, `lib/src/content/**`, `lib/src/diagnostics/**`, `lib/src/auth/**`, `lib/src/config/**`, `lib/src/e2e/**`, `lib/src/generated/**`, `lib/src/storage/object_store.dart` interface, `lib/src/seed/fixture_loader.dart`, `lib/server.dart`, `bin/main.dart`, `config/**` (except the git-ignored `passwords.yaml`), `web/**`, `analysis_options.yaml`, `dart_test.yaml`, `edubox_server/test/integration/authorization/**`, `auth/**`, `support/**`, `test_tools/**`, `e2e/**`, `classes/**`, `content/**`, `profile/**`, `diagnostics/**`, `edubox_client/**`, `edubox_fixtures/**`, `compose.yaml`, `.dockerignore`, `.gitignore`, `tool/bootstrap.sh`, `tool/coverage_gate.dart`, `.github/workflows/ci.yml`, root `pubspec.yaml` workspace/SDK section, `docs/build/phase-1/**` | Change only with a contract change; backend fixes inside a method body are allowed if signatures and DTOs stay fixed. |
+| Contract (frozen) | `edubox_server/lib/src/models/**`, `migrations/**`, `lib/src/authz/**`, `lib/src/profile/**`, `lib/src/classes/**`, `lib/src/content/**`, `lib/src/diagnostics/**`, `lib/src/auth/**`, `lib/src/config/**`, `lib/src/e2e/**`, `lib/src/generated/**`, `lib/src/storage/object_store.dart` interface, `lib/src/seed/fixture_loader.dart`, `lib/server.dart`, `bin/main.dart`, `config/**` (except the git-ignored `passwords.yaml`), `web/**`, `analysis_options.yaml`, `dart_test.yaml`, `edubox_server/test/integration/authorization/**`, `auth/**`, `contract/**`, `support/**`, `test_tools/**`, `e2e/**`, `classes/**`, `content/**`, `profile/**`, `diagnostics/**`, `edubox_client/**`, `edubox_fixtures/**`, `compose.yaml`, `.dockerignore`, `.gitignore`, `tool/bootstrap.sh`, `tool/coverage_gate.dart`, `.github/workflows/ci.yml`, root `pubspec.yaml` workspace/SDK section, `docs/build/phase-1/**` | Change only with a contract change; backend fixes inside a method body are allowed if signatures and DTOs stay fixed. |
 | Backend track | Stub method bodies in `edubox_server/lib/src/storage/object_store.dart`, `lib/src/seed/seed_command.dart`, `bin/seed.dart`, `edubox_server/Dockerfile` (including the seed build target; the entrypoint section is frozen by this contract), `edubox_server/pubspec.yaml` dependencies, `edubox_server/test/integration/storage/**`, `edubox_server/test/integration/seed/**` (remove `backend-pending` tags) | Storage spike, seed command, MinIO setup. |
-| Frontend track | `edubox_flutter/lib/main.dart`, `lib/src/app/**`, `lib/src/shell/**`, `lib/src/screens/**`, `lib/src/features/**`, `lib/src/data/**` (repository implementations), `lib/src/network/**` (production network source), `lib/src/theme/**`, `edubox_flutter/android/**`, `edubox_flutter/assets/**` (fonts and images), `edubox_flutter/pubspec.yaml` dependencies, `edubox_flutter/analysis_options.yaml`, `test/widget/**`, `integration_test/**` | Screens, theme tokens, bundled fonts, production repositories and network probe. |
-| Contract (app) | `edubox_flutter/lib/src/contract/**`, `lib/src/fake/**`, `lib/src/local/local_store.dart` + `local_store.g.dart`, `lib/l10n/app_vi.arb`, `lib/l10n/generated/**`, `l10n.yaml`, `test/contract/**`, `test/local/local_store_test.dart`, `test/l10n/**` | The interfaces, fake, cache schema, ARB keys and their tests. |
+| Frontend track | `edubox_flutter/lib/main.dart`, `lib/src/app/**`, `lib/src/shell/**`, `lib/src/screens/**`, `lib/src/features/**`, `lib/src/data/**` (repository implementations), `lib/src/network/**` (production network source), `lib/src/theme/**`, `edubox_flutter/android/**`, `edubox_flutter/assets/**` (fonts and images), `edubox_flutter/pubspec.yaml` dependencies, `edubox_flutter/analysis_options.yaml`, `edubox_flutter/test/**` except `test/contract/**`, `test/local/**`, `test/l10n/**`, and `integration_test/**` | Screens, theme tokens, bundled fonts, production repositories and network probe, and the unit tests for the data and network layers (`test/data/**`, `test/network/**`, `test/app/**`, `test/widget/**`). |
+| Contract (app) | `edubox_flutter/lib/src/contract/**`, `lib/src/fake/**`, `lib/src/local/local_store.dart` + `local_store.g.dart`, `lib/l10n/app_vi.arb`, `lib/l10n/generated/**`, `l10n.yaml`, `test/contract/**`, `test/local/**`, `test/l10n/**` | The interfaces, fake, cache schema, ARB keys and their tests. |
 
 Lockfile and dependency rule: each track may add or change dependencies in its
 own `pubspec.yaml`, but both tracks may regenerate and commit the shared root

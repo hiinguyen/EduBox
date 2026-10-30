@@ -25,9 +25,18 @@ void runBackendContractTests({
   ManualNetworkController? network,
   SetRole? setRole,
   Future<void> Function()? clearCache,
+  Future<void> Function()? resetState,
 }) {
   group(name, () {
     late EduBoxBackend backend;
+
+    // Real-server runs pass `resetState` (the e2e `reset` step) so a long-lived
+    // server starts each suite run from the seeded fixtures; the wrong-password
+    // and too-many-attempts cases would otherwise accumulate rate-limit hits.
+    setUpAll(() async {
+      final reset = resetState;
+      if (reset != null) await reset();
+    });
 
     setUp(() async => backend = await createBackend());
     tearDown(() => backend.dispose());

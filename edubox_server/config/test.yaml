@@ -33,4 +33,6 @@ edubox:
     publicEndpoint: http://localhost:9000
     bucket: edubox-test
     region: us-east-1
-  e2eControl: false
+  # The test run mode is allowed to expose the token-guarded e2e control
+  # route; production and staging are rejected by the run-mode gate.
+  e2eControl: true
