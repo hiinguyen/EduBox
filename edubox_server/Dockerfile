@@ -24,6 +24,11 @@ WORKDIR /app/edubox_server
 RUN dart build cli --target bin/main.dart --output build
 RUN mv build/bundle/bin/main build/bundle/bin/server
 
+# Compile the seed CLI (compose `seed` service: `./bin/seed`). Only the
+# executable is kept: it loads the same native libraries from bundle/lib.
+RUN dart build cli --target bin/seed.dart --output build_seed
+RUN mv build_seed/bundle/bin/seed build/bundle/bin/seed
+
 # Runtime configuration is mounted by compose; the image holds only the
 # committed run-mode files.
 RUN mkdir -p config web migrations
