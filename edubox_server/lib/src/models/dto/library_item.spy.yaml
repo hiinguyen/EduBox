@@ -1,0 +1,9 @@
+class: LibraryItem
+fields:
+  id: int
+  type: ContentType
+  title: String
+  # Empty string means no subject.
+  subject: String
+  gradeLevel: int
+  createdAt: DateTime

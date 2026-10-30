@@ -1,0 +1,6 @@
+# `content.library`: the caller's classes plus the approved content of those
+# classes, newest first. An empty `classes` list is the "no class" state.
+class: StudentLibrary
+fields:
+  classes: List<StudentClass>
+  items: List<LibraryItem>

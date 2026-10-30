@@ -1,0 +1,7 @@
+# Only `approved` content of one of a student's classes is visible to that
+# student. The owning teacher approves explicitly (phase 2 adds the method).
+enum: ContentStatus
+serialized: byName
+values:
+  - draft
+  - approved

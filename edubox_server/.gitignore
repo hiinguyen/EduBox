@@ -1,0 +1,12 @@
+# Files and directories created by pub
+.dart_tool/
+
+# Build outputs
+build/
+coverage/
+
+# Secrets: created from passwords.example.yaml by tool/bootstrap.sh
+config/passwords.yaml
+
+# Embedded PostgreSQL artifacts (not used; the compose stack provides PostgreSQL)
+.serverpod/

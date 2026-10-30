@@ -1,0 +1,13 @@
+# `content.classIds[]` as a join table (the content's class scope).
+class: ContentClass
+serverOnly: true
+table: content_classes
+fields:
+  contentId: int, relation(parent=content, onDelete=Cascade)
+  classId: int, relation(parent=classes, onDelete=Cascade)
+indexes:
+  content_classes_content_class_idx:
+    fields: contentId, classId
+    unique: true
+  content_classes_class_idx:
+    fields: classId

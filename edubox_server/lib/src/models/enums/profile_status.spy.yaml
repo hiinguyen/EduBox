@@ -1,0 +1,7 @@
+# Result of `profile.me`: `ready` carries the caller's profile; `notSetUp`
+# means no `users` row, a null role, or a role the server cannot parse.
+enum: ProfileStatus
+serialized: byName
+values:
+  - ready
+  - notSetUp

@@ -1,0 +1,17 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    avoid_print: true
+    prefer_const_constructors: true
+    unawaited_futures: true
+
+formatter:
+  trailing_commas: preserve
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - lib/l10n/generated/**
+    - lib/**/*.g.dart

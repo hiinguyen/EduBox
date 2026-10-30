@@ -1,0 +1,9 @@
+# The caller's own profile, as returned by `profile.me`.
+class: Profile
+fields:
+  userId: int
+  role: UserRole
+  name: String
+  email: String
+  # Parents only: the linked child's display name, or null when unlinked.
+  linkedStudentName: String?

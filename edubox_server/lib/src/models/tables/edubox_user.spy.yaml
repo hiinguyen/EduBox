@@ -1,0 +1,18 @@
+# The EduBox profile of a Serverpod auth user. Server-only: clients read it
+# through `profile.me` and can never write it.
+class: EduboxUser
+serverOnly: true
+table: users
+fields:
+  authUserId: UuidValue, relation(parent=serverpod_auth_core_user, onDelete=Cascade)
+  # Raw role text: `student`, `teacher`, `parent`, or null (not set up).
+  role: String?
+  name: String
+  email: String
+  # Parents only.
+  linkedStudentId: int?, relation(parent=users, onDelete=SetNull)
+  linkedStudentName: String?
+indexes:
+  users_auth_user_id_idx:
+    fields: authUserId
+    unique: true

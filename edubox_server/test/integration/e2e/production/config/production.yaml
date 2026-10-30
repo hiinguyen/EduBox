@@ -1,0 +1,38 @@
+# Test-only production run mode used to prove that the e2e control route is
+# rejected outside the allowed run modes. Values are committed test fixtures,
+# not secrets. The database is the compose `postgres_test` service.
+apiServer:
+  port: 0
+  publicHost: localhost
+  publicPort: 0
+  publicScheme: http
+
+insightsServer:
+  port: 0
+  publicHost: localhost
+  publicPort: 0
+  publicScheme: http
+
+database:
+  host: localhost
+  port: 9090
+  name: edubox_test
+  user: postgres
+
+redis:
+  enabled: false
+
+maxRequestSize: 524288
+
+sessionLogs:
+  persistentEnabled: false
+  consoleEnabled: false
+
+edubox:
+  storage:
+    endpoint: http://localhost:9000
+    publicEndpoint: http://localhost:9000
+    bucket: edubox-test
+    region: us-east-1
+  # Deliberately true: the run-mode gate must still reject the route.
+  e2eControl: true

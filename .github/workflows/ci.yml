@@ -1,0 +1,221 @@
+name: EduBox CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edubox-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.8'
+
+jobs:
+  server:
+    name: Server (format, analyze, generated, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres_test:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: edubox_test
+          POSTGRES_PASSWORD: dev-only-postgres-test-password
+        ports:
+          - 9090:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d edubox_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # GitHub Actions service containers cannot pass a command, and the
+      # pgsty/minio image's default command only prints help. Start the server
+      # in a step so it runs `minio server /data`, then wait for health.
+      - name: Start MinIO
+        run: |
+          docker run -d --rm --name edubox-minio --network host \
+            -e MINIO_ROOT_USER=edubox-dev \
+            -e MINIO_ROOT_PASSWORD=dev-only-minio-password \
+            pgsty/minio:RELEASE.2026-08-04T00-00-00Z \
+            server /data --console-address :9001
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              http://localhost:9000/minio/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs edubox-minio
+          exit 1
+
+      - name: Install Flutter (pinned)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install Serverpod CLI (pinned)
+        run: dart pub global activate serverpod_cli 4.0.4
+
+      - name: Add pub global bin to PATH
+        run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Bootstrap dev-only passwords
+        run: bash tool/bootstrap.sh
+
+      - name: Create MinIO test bucket
+        run: |
+          docker run --rm --network host \
+            -e MC_HOST_local=http://edubox-dev:dev-only-minio-password@localhost:9000 \
+            pgsty/mc:RELEASE.2026-08-04T00-00-00Z \
+            mb --ignore-existing local/edubox-test
+          docker run --rm --network host \
+            -e MC_HOST_local=http://edubox-dev:dev-only-minio-password@localhost:9000 \
+            pgsty/mc:RELEASE.2026-08-04T00-00-00Z \
+            anonymous set none local/edubox-test
+
+      - name: Fixture package tests
+        working-directory: edubox_fixtures
+        run: dart test
+
+      - name: Generate server protocol and client
+        working-directory: edubox_server
+        run: serverpod generate
+
+      - name: Stale generated code check
+        run: >-
+          git diff --exit-code --
+          edubox_server/lib/src/generated
+          edubox_server/test/integration/test_tools
+          edubox_client/lib/src/protocol
+
+      - name: Format check
+        working-directory: edubox_server
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        working-directory: edubox_server
+        run: dart analyze --fatal-infos
+
+      - name: Server tests with coverage
+        working-directory: edubox_server
+        run: dart test --coverage=coverage
+
+      - name: Format coverage report
+        working-directory: edubox_server
+        run: >-
+          dart run coverage:format_coverage
+          --lcov
+          --in=coverage
+          --out=coverage/lcov.info
+          --report-on=lib
+
+      - name: Coverage gate
+        run: dart run tool/coverage_gate.dart edubox_server/coverage/lcov.info
+
+      - name: Build server image
+        run: docker build -f edubox_server/Dockerfile -t edubox-server:ci .
+
+      # Catches an entrypoint/CMD regression without waiting for the AVD run.
+      - name: Server image smoke check
+        run: |
+          docker run -d --name edubox-server-smoke --network host \
+            -e SERVERPOD_DATABASE_HOST=localhost \
+            -e SERVERPOD_DATABASE_PORT=9090 \
+            -e SERVERPOD_DATABASE_NAME=edubox_test \
+            -e SERVERPOD_DATABASE_USER=postgres \
+            -e SERVERPOD_DATABASE_PASSWORD=dev-only-postgres-test-password \
+            -e EDUBOX_STORAGE_ENDPOINT=http://localhost:9000 \
+            -e EDUBOX_STORAGE_PUBLIC_ENDPOINT=http://localhost:9000 \
+            -e EDUBOX_STORAGE_BUCKET=edubox-test \
+            -v "$PWD/edubox_server/config:/app/config:ro" \
+            edubox-server:ci --mode development --apply-migrations
+          for _ in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8080/readyz; then
+              docker rm -f edubox-server-smoke
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs edubox-server-smoke
+          exit 1
+
+  app:
+    name: App (analyze, format, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Flutter (pinned)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Resolve workspace
+        working-directory: edubox_flutter
+        run: flutter pub get
+
+      - name: Generate l10n
+        working-directory: edubox_flutter
+        run: flutter gen-l10n
+
+      - name: Stale l10n check
+        run: git diff --exit-code -- edubox_flutter/lib/l10n/generated
+
+      - name: Generate drift code
+        working-directory: edubox_flutter
+        run: dart run build_runner build
+
+      - name: Stale drift check
+        run: git diff --exit-code -- edubox_flutter/lib/src/local/local_store.g.dart
+
+      - name: Analyze
+        working-directory: edubox_flutter
+        run: flutter analyze
+
+      - name: Format check
+        working-directory: edubox_flutter
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: App tests
+        working-directory: edubox_flutter
+        run: flutter test
+
+# Android emulator E2E is intentionally not in CI yet: it needs the
+# edubox_tablet AVD and a running compose stack. docs/build/phase-1/contract.md
+# records it as a later addition.

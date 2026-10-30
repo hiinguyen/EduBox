@@ -1,0 +1,13 @@
+name: _
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+# Pub workspace: one lockfile for the server, the generated client, the
+# Flutter app, and the shared phase fixtures.
+workspace:
+  - edubox_client
+  - edubox_fixtures
+  - edubox_flutter
+  - edubox_server

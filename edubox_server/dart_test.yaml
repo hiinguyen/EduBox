@@ -1,0 +1,3 @@
+# Integration tests share the compose `postgres_test` service.
+tags:
+  integration: {}

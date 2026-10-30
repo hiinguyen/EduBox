@@ -1,0 +1,7 @@
+# One message of `diagnostics.pingStream`.
+class: PingMessage
+fields:
+  sequence: int
+  total: int
+  role: UserRole
+  sentAt: DateTime

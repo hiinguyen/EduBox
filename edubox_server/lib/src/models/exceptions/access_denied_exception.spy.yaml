@@ -1,0 +1,4 @@
+# Thrown by every EduBox endpoint method whose caller may not perform it.
+exception: AccessDeniedException
+fields:
+  reason: AccessDeniedReason

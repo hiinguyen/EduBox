@@ -1,0 +1,248 @@
+{
+  "@@locale": "vi",
+  "appName": "EduBox",
+  "appOpening": "Đang mở EduBox…",
+  "appMarkSemantics": "EduBox",
+  "signInTitle": "Đăng nhập",
+  "emailLabel": "Email",
+  "passwordLabel": "Mật khẩu",
+  "signInButton": "Đăng nhập",
+  "signInSubmitting": "Đang đăng nhập…",
+  "showPassword": "Hiện mật khẩu",
+  "hidePassword": "Ẩn mật khẩu",
+  "emailRequired": "Vui lòng nhập email",
+  "emailInvalid": "Email chưa đúng định dạng",
+  "passwordRequired": "Vui lòng nhập mật khẩu",
+  "signInWrongCredentials": "Email hoặc mật khẩu không đúng",
+  "backendUnreachable": "Không kết nối được với EduBox",
+  "backendUnreachableHint": "Kiểm tra kết nối mạng rồi thử lại.",
+  "retry": "Thử lại",
+  "retrying": "Đang thử lại…",
+  "signInTooManyAttempts": "Đã thử quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.",
+  "signInAccountDisabled": "Tài khoản này đang bị tạm khóa. Vui lòng liên hệ nhà trường.",
+  "signInUnknownError": "Không đăng nhập được. Vui lòng thử lại.",
+  "signInHelp": "Quên mật khẩu hoặc chưa có tài khoản? Vui lòng liên hệ nhà trường.",
+  "accountNotSetUp": "Tài khoản chưa được thiết lập",
+  "accountNotSetUpBody": "Bạn đã đăng nhập đúng, nhưng tài khoản này chưa được gán vai trò (học sinh, giáo viên hoặc phụ huynh). Việc này do nhà trường thực hiện, không phải lỗi của bạn.",
+  "accountNotSetUpContact": "Hãy nhờ giáo viên hoặc quản trị viên của trường thiết lập giúp, rồi bấm \"Kiểm tra lại\".",
+  "accountSignedInAs": "Đang đăng nhập bằng",
+  "accountSignedInAsSemantics": "Đang đăng nhập bằng {email}",
+  "@accountSignedInAsSemantics": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "accountCheckAgain": "Kiểm tra lại",
+  "accountChecking": "Đang kiểm tra…",
+  "accountStillNotSetUp": "Vẫn chưa được thiết lập.",
+  "accountCheckedAt": "Đã kiểm tra lúc {time}",
+  "@accountCheckedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "accountCheckFailedOffline": "Chưa kiểm tra được vì không có kết nối mạng.",
+  "signOut": "Đăng xuất",
+  "signOutBusy": "Đang đăng xuất…",
+  "signOutConfirmTitle": "Đăng xuất khỏi EduBox?",
+  "signOutConfirmBody": "Em sẽ cần nhập lại email và mật khẩu để vào lại.",
+  "signOutOfflineWarning": "Đang ngoại tuyến nên em sẽ chưa đăng nhập lại được cho tới khi có mạng.",
+  "signOutFailed": "Không đăng xuất được. Hãy thử lại.",
+  "cancel": "Hủy",
+  "navHome": "Trang chủ",
+  "navLibrary": "Thư viện",
+  "navTeacherOverview": "Tổng quan",
+  "studentHomeGreeting": "Chào {name}",
+  "@studentHomeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "studentHomeGreetingNoName": "Xin chào",
+  "studentHomeDateLine": "{className} · {date}",
+  "@studentHomeDateLine": {
+    "placeholders": {
+      "className": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "studentHomeDateOnly": "{date}",
+  "@studentHomeDateOnly": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "studentHomeLibraryTitle": "Mới thêm vào thư viện",
+  "studentHomeLibraryCount": "{count} tài liệu cho lớp em",
+  "@studentHomeLibraryCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studentHomeOpenLibrary": "Mở thư viện",
+  "studentHomeLoadingLibrary": "Đang tải thư viện",
+  "studentHomeLibraryError": "Không tải được thư viện.",
+  "studentHomeLibraryOfflineNoCache": "Không tải được thư viện vì đang ngoại tuyến.",
+  "studentHomeProfileError": "Không tải được thông tin tài khoản.",
+  "studentNoClass": "Em chưa được xếp vào lớp nào.",
+  "studentNoClassHint": "Hãy nhờ giáo viên thêm em vào lớp.",
+  "libraryTitle": "Thư viện",
+  "libraryTotal": "{count} tài liệu",
+  "@libraryTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryListSemantics": "Danh sách tài liệu",
+  "librarySubjectOther": "Môn khác",
+  "libraryLoading": "Đang tải thư viện",
+  "libraryEmpty": "Thư viện của lớp chưa có tài liệu nào.",
+  "libraryEmptyHint": "Khi giáo viên duyệt tài liệu, tài liệu sẽ hiện ở đây.",
+  "libraryOfflineNoData": "Máy chưa lưu danh sách tài liệu. Kết nối mạng để xem thư viện.",
+  "libraryLoadError": "Không tải được thư viện.",
+  "libraryLoadErrorWithTime": "Không tải được thư viện. Cập nhật lần cuối {time}.",
+  "@libraryLoadErrorWithTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryItemSemantics": "{title}, {type}",
+  "@libraryItemSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "contentTypeEbook": "Sách",
+  "contentTypeVideo": "Video",
+  "contentTypeExercise": "Bài tập",
+  "contentRowSemantics": "{title}, {type}, {subject}",
+  "@contentRowSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      },
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "lastUpdatedAt": "Cập nhật lần cuối {time}.",
+  "@lastUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "networkOffline": "Đang ngoại tuyến. Dữ liệu đã lưu vẫn hiển thị.",
+  "networkOfflineStale": "Đang ngoại tuyến. Dữ liệu hiển thị có thể chưa mới nhất.",
+  "networkReconnecting": "Đã kết nối lại, đang cập nhật…",
+  "accountMenuTooltip": "Tài khoản",
+  "parentMenuTooltip": "Tùy chọn",
+  "teacherClassesTitle": "Lớp của tôi",
+  "teacherClassesCount": "{count} lớp",
+  "@teacherClassesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "classColumnName": "Lớp",
+  "classColumnGrade": "Khối",
+  "classColumnSubjects": "Môn học",
+  "classColumnStudents": "Học sinh",
+  "classGradeValue": "Khối {grade}",
+  "@classGradeValue": {
+    "placeholders": {
+      "grade": {
+        "type": "int"
+      }
+    }
+  },
+  "classStudentCount": "{count} học sinh",
+  "@classStudentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "classRowSemantics": "{name}, khối {grade}, môn {subjects}, {count} học sinh",
+  "@classRowSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "grade": {
+        "type": "int"
+      },
+      "subjects": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "valueMissing": "-",
+  "teacherRoleLabel": "Giáo viên",
+  "teacherClassesLoading": "Đang tải danh sách lớp",
+  "teacherClassesLoaded": "Đã tải {count} lớp",
+  "@teacherClassesLoaded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "teacherClassesEmpty": "Bạn chưa được phân công lớp nào. Liên hệ quản trị viên của trường để được thêm vào lớp.",
+  "teacherClassesOfflineNoData": "Chưa có danh sách lớp trên máy này. Danh sách sẽ hiện khi có mạng.",
+  "teacherClassesError": "Không tải được danh sách lớp.",
+  "teacherClassesStaleError": "Không cập nhật được danh sách lớp. Cập nhật lần cuối {time}.",
+  "@teacherClassesStaleError": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "parentHomeStudentLabel": "Học sinh",
+  "parentHomeStudentSemantics": "Học sinh: {name}",
+  "@parentHomeStudentSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "parentHomeNoChild": "Tài khoản này chưa được liên kết với học sinh nào. Hãy liên hệ nhà trường để được hỗ trợ.",
+  "parentHomeLoadError": "Không tải được thông tin học sinh.",
+  "parentHomeOfflineNoData": "Chưa có thông tin học sinh trên máy này. Hãy kết nối mạng để tải."
+}

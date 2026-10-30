@@ -1,0 +1,10 @@
+class: SchoolClass
+serverOnly: true
+table: classes
+fields:
+  teacherId: int, relation(parent=users, onDelete=Restrict)
+  name: String
+  gradeLevel: int
+indexes:
+  classes_teacher_id_idx:
+    fields: teacherId

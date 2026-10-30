@@ -1,0 +1,7 @@
+# One of the calling student's classes (no roster, no counts).
+class: StudentClass
+fields:
+  id: int
+  name: String
+  gradeLevel: int
+  subjects: List<String>

@@ -1,0 +1,14 @@
+emailIdp:
+  - login:
+jwtRefresh:
+  - refreshAccessToken:
+classes:
+  - mine:
+content:
+  - library:
+diagnostics:
+  - pingStream:
+e2e:
+  - run:
+profile:
+  - me:
