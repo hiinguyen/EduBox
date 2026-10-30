@@ -1,4 +1,6 @@
 import 'package:edubox_fixtures/edubox_fixtures.dart';
+import 'package:edubox_flutter/src/app/app_scope.dart';
+import 'package:edubox_flutter/src/app/connectivity_state.dart';
 import 'package:edubox_flutter/src/local/local_store.dart';
 import 'package:edubox_flutter/src/screens/account_not_set_up/account_not_set_up_screen.dart';
 import 'package:edubox_flutter/src/screens/parent_home/parent_home_screen.dart';
@@ -180,26 +182,30 @@ void main() {
     harness.network.goOffline();
     await settle(tester);
     expect(find.text(vi.networkOffline), findsOneWidget);
+    final connectivity = AppScope.of(
+      tester.element(find.byKey(const Key('screen.studentHome'))),
+    ).connectivity;
+    // The strip shows only while the reloads run, and they can finish before
+    // the first sampled frame. Record every state instead of sampling.
+    final strips = <StripState>[connectivity.strip];
+    void record() => strips.add(connectivity.strip);
+    connectivity.addListener(record);
+    addTearDown(() => connectivity.removeListener(record));
     await harness.control('reconnect-library');
     harness.network.goOnline();
-    // The strip is transient: pump in a bounded loop until it appears, so
-    // the run proves the reconnecting half and cannot hang.
-    var sawReconnecting = false;
-    final deadline = DateTime.now().add(const Duration(seconds: 5));
-    while (DateTime.now().isBefore(deadline)) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.text(vi.networkReconnecting).evaluate().isNotEmpty) {
-        sawReconnecting = true;
-        break;
-      }
-    }
-    expect(
-      sawReconnecting,
-      isTrue,
-      reason: 'the networkReconnecting strip was never shown',
-    );
     await waitFor(tester, find.text(reconnectDeltaContent.title));
     await settle(tester);
+    expect(
+      strips,
+      containsAllInOrder([
+        StripState.offline,
+        StripState.reconnecting,
+        StripState.hidden,
+      ]),
+      reason: 'the app must pass offline -> reconnecting -> online',
+    );
+    expect(connectivity.strip, StripState.hidden);
+    expect(find.text(reconnectDeltaContent.title), findsOneWidget);
     expect(find.text(vi.networkReconnecting), findsNothing);
     expect(find.text(vi.networkOffline), findsNothing);
   });
