@@ -54,6 +54,20 @@ void main() {
     expect(stageOf(tester), AppStage.home);
   });
 
+  testWidgets('retry label starts at the message text column', (tester) async {
+    final holder = ManualNetworkControllerHolder.create();
+    holder.fake.restoreError = const BackendUnreachableError();
+    await pumpEduApp(
+      tester,
+      fake: holder.fake,
+      network: holder.network,
+      signedInAs: FixtureKeys.studentAn,
+    );
+    final messageX = tester.getTopLeft(find.text(vi.backendUnreachable)).dx;
+    final retryX = tester.getTopLeft(find.text(vi.retry)).dx;
+    expect(retryX, messageX);
+  });
+
   for (final (name, size) in [
     ('phone', TestSizes.phone),
     ('tablet', TestSizes.tablet),

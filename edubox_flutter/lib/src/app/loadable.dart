@@ -16,6 +16,7 @@ class Loadable<T> extends ChangeNotifier {
   BackendError? _error;
   bool _isLoading = false;
   bool _disposed = false;
+  int _loadSeq = 0;
 
   T? get value => _value;
 
@@ -32,12 +33,14 @@ class Loadable<T> extends ChangeNotifier {
 
   bool get hasValue => _value != null;
 
-  /// Loads once; concurrent calls share nothing and simply both run.
+  /// Loads once. Only the newest call applies: an older call that resolves
+  /// after a newer one is discarded and cannot clear the newer busy state.
   Future<void> load() async {
+    final seq = ++_loadSeq;
     _isLoading = true;
     _notify();
     final result = await _fetch();
-    if (_disposed) return;
+    if (_disposed || seq != _loadSeq) return;
     switch (result) {
       case BackendOk(:final value, :final cachedAt, :final isStale):
         _value = value;

@@ -3,11 +3,80 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../screens/app_start/app_start_screens.dart';
 import '../theme/edu_theme.dart';
 import 'app_scope.dart';
 import 'connectivity_state.dart';
 import 'session_controller.dart';
 import 'stage_router.dart';
+
+/// Boots [AppServices] behind the first frame. The native splash gives way
+/// to the opening screen immediately; a startup exception shows the
+/// app-start failure panel instead of escaping to an unpainted root.
+class EduBoxBootstrap extends StatefulWidget {
+  const EduBoxBootstrap({super.key, required this.createServices});
+
+  final Future<AppServices> Function() createServices;
+
+  @override
+  State<EduBoxBootstrap> createState() => _EduBoxBootstrapState();
+}
+
+class _EduBoxBootstrapState extends State<EduBoxBootstrap> {
+  AppServices? _services;
+  bool _failed = false;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final generation = ++_generation;
+    try {
+      final services = await widget.createServices();
+      if (!mounted || generation != _generation) {
+        unawaited(services.backend.dispose());
+        return;
+      }
+      setState(() {
+        _services = services;
+        _failed = false;
+      });
+    } catch (error, stackTrace) {
+      if (!mounted || generation != _generation) return;
+      debugPrint('EduBox startup failed: $error\n$stackTrace');
+      setState(() => _failed = true);
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() => _failed = false);
+    await _load();
+  }
+
+  @override
+  void dispose() {
+    // A load that lands after disposal must not hold resources.
+    _generation++;
+    final services = _services;
+    if (services != null) unawaited(services.backend.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final services = _services;
+    if (services != null) return EduBoxApp(services: services);
+    return _appFrame(
+      home: _failed
+          ? AppStartFailedScreen(onRetry: _retry)
+          : const AppOpeningScreen(),
+    );
+  }
+}
 
 /// The app root. Re-creating it (a new [EduBoxApp] over a reopened drift
 /// store) is the E2E harness's in-process restart.
@@ -29,9 +98,11 @@ class _EduBoxAppState extends State<EduBoxApp> {
   @override
   void initState() {
     super.initState();
-    _session = SessionController(widget.services.backend)
-      ..addListener(_onSession);
     _connectivity = ConnectivityState(widget.services.network);
+    _session = SessionController(
+      widget.services.backend,
+      connectivity: _connectivity,
+    )..addListener(_onSession);
     unawaited(_session.start());
   }
 
@@ -58,15 +129,8 @@ class _EduBoxAppState extends State<EduBoxApp> {
       services: widget.services,
       session: _session,
       connectivity: _connectivity,
-      child: MaterialApp(
+      child: _appFrame(
         navigatorKey: _navigatorKey,
-        onGenerateTitle: (context) => AppLocalizations.of(context).appName,
-        debugShowCheckedModeBanner: false,
-        theme: buildEduTheme(),
-        themeMode: ThemeMode.light,
-        locale: const Locale('vi'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: ListenableBuilder(
           listenable: _session,
           builder: (context, _) => StageRouter(session: _session),
@@ -74,4 +138,22 @@ class _EduBoxAppState extends State<EduBoxApp> {
       ),
     );
   }
+}
+
+/// The one MaterialApp frame: Vietnamese, light only, the EduBox theme.
+Widget _appFrame({
+  required Widget home,
+  GlobalKey<NavigatorState>? navigatorKey,
+}) {
+  return MaterialApp(
+    navigatorKey: navigatorKey,
+    onGenerateTitle: (context) => AppLocalizations.of(context).appName,
+    debugShowCheckedModeBanner: false,
+    theme: buildEduTheme(),
+    themeMode: ThemeMode.light,
+    locale: const Locale('vi'),
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    home: home,
+  );
 }

@@ -64,7 +64,6 @@ class _AppStartFailedScreenState extends State<AppStartFailedScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final palette = EduPalette.of(context);
     return AuthPanelScaffold(
       key: const Key('screen.appStartFailed'),
       child: Column(
@@ -73,43 +72,12 @@ class _AppStartFailedScreenState extends State<AppStartFailedScreen> {
         children: [
           const EduLockup(),
           const SizedBox(height: EduSpace.s24),
-          Semantics(
-            liveRegion: true,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Icon(
-                    Icons.cloud_off_outlined,
-                    size: EduSize.statusGlyph,
-                    color: palette.muted,
-                  ),
-                ),
-                const SizedBox(width: EduSpace.s8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.backendUnreachable,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: EduSpace.s4),
-                      Text(
-                        l10n.backendUnreachableHint,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium!.copyWith(color: palette.muted),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          BlockMessage(
+            message: l10n.backendUnreachable,
+            hint: l10n.backendUnreachableHint,
+            tone: BlockTone.offline,
+            action: RetryButton(onPressed: _retry, busy: _busy),
           ),
-          const SizedBox(height: EduSpace.s8),
-          RetryButton(onPressed: _retry, busy: _busy),
         ],
       ),
     );

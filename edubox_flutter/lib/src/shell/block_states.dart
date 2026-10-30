@@ -140,18 +140,33 @@ class BusyLabel extends StatelessWidget {
 
 /// The ink "Thử lại" text button; while [busy] it reads "Đang thử lại…"
 /// with the in-button spinner and is disabled.
+///
+/// The label starts at the block's text column (the 18dp glyph plus its
+/// 8dp gap) rather than a TextButton's default 12dp inset, so it aligns
+/// with the message and hint in every block that shows it.
 class RetryButton extends StatelessWidget {
-  const RetryButton({super.key, required this.onPressed, this.busy = false});
+  const RetryButton({
+    super.key,
+    required this.onPressed,
+    this.busy = false,
+    this.buttonKey = const Key('block.retry'),
+  });
 
   final VoidCallback onPressed;
   final bool busy;
+  final Key buttonKey;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return TextButton(
-      key: const Key('block.retry'),
+      key: buttonKey,
       onPressed: busy ? null : onPressed,
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        alignment: AlignmentDirectional.centerStart,
+        minimumSize: const Size(EduSize.tapTarget, EduSize.tapTarget),
+      ),
       child: busy ? BusyLabel(label: l10n.retrying) : Text(l10n.retry),
     );
   }

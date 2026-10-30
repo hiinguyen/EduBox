@@ -5,11 +5,13 @@ import 'src/app/production_services.dart';
 import 'src/contract/backend_config.dart';
 import 'src/theme/font_licenses.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
-  final services = await createProductionServices(
-    BackendConfig.fromEnvironment(),
+  runApp(
+    EduBoxBootstrap(
+      createServices: () =>
+          createProductionServices(BackendConfig.fromEnvironment()),
+    ),
   );
-  runApp(EduBoxApp(services: services));
 }

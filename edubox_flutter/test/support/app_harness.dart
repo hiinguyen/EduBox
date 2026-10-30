@@ -1,6 +1,7 @@
 import 'package:edubox_flutter/l10n/generated/app_localizations.dart';
 import 'package:edubox_flutter/src/app/app_scope.dart';
 import 'package:edubox_flutter/src/app/edubox_app.dart';
+import 'package:edubox_flutter/src/contract/backend.dart';
 import 'package:edubox_flutter/src/contract/network_controller.dart';
 import 'package:edubox_flutter/src/fake/fake_backend.dart';
 import 'package:flutter/material.dart';
@@ -60,13 +61,14 @@ Future<TestApp> pumpEduApp(
   double textScale = 1,
   String? signedInAs,
   FakeBackend? fake,
+  EduBoxBackend? backend,
   ManualNetworkController? network,
   bool settle = true,
 }) async {
   setWindow(tester, size, textScale: textScale);
   final seam = network ?? ManualNetworkController();
-  final backend = fake ?? newFake(seam);
-  if (signedInAs != null) backend.signInAs(signedInAs);
+  final resolvedFake = fake ?? newFake(seam);
+  if (signedInAs != null) resolvedFake.signInAs(signedInAs);
   await tester.pumpWidget(
     RepaintBoundary(
       key: rootKey,
@@ -74,7 +76,7 @@ Future<TestApp> pumpEduApp(
         // A new key per pump: pumping again re-creates the app root.
         key: UniqueKey(),
         services: AppServices(
-          backend: backend,
+          backend: backend ?? resolvedFake,
           network: seam,
           clock: fixedClock,
         ),
@@ -82,7 +84,7 @@ Future<TestApp> pumpEduApp(
     ),
   );
   if (settle) await tester.pumpAndSettle();
-  return TestApp(backend, seam);
+  return TestApp(resolvedFake, seam);
 }
 
 /// The three Flutter accessibility guidelines of exit criterion 17.
