@@ -19,11 +19,17 @@ void main() {
       store = CachedDataStore(EduBoxDatabase.inMemory());
       return CachedBackend(api: api, store: store, network: network);
     },
-    createUnreachableBackend: () async => CachedBackend(
-      api: FixtureEduBoxApi(unreachable: true),
-      store: CachedDataStore(EduBoxDatabase.inMemory()),
-      network: ManualNetworkController(),
-    ),
+    createUnreachableBackend: () async {
+      // Close the suite's in-memory database first: opening a second
+      // EduBoxDatabase while it is open trips drift's multiple-database
+      // warning, even though each executor is its own memory file.
+      await store.close();
+      return CachedBackend(
+        api: FixtureEduBoxApi(unreachable: true),
+        store: CachedDataStore(EduBoxDatabase.inMemory()),
+        network: ManualNetworkController(),
+      );
+    },
     network: network,
     setRole: (accountKey, role) async => api.setRole(accountKey, role),
     clearCache: () => store.clearAll(),

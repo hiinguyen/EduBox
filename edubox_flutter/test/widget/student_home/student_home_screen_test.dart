@@ -305,13 +305,14 @@ void main() {
     expect(find.byType(RoleShell), findsOneWidget);
     await pumpEduApp(tester, signedInAs: FixtureKeys.studentAn);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byKey(RoleShellKeys.destinationPill(0)),
-        matching: find.text(vi.navHome),
-      ),
-      findsOneWidget,
+    final pillLabel = find.descendant(
+      of: find.byKey(RoleShellKeys.destinationPill(0)),
+      matching: find.text(vi.navHome),
     );
+    expect(pillLabel, findsOneWidget);
+    final label = tester.widget<Text>(pillLabel);
+    expect(label.style?.fontSize, 14);
+    expect(label.style?.height, closeTo(20 / 14, 0.001));
   });
 
   testWidgets('200% text on a phone reflows without overflow', (tester) async {

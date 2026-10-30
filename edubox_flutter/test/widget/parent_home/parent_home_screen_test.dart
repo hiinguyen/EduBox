@@ -21,6 +21,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
     semantics.dispose();
     await expectAccessibilityGuidelines(tester);
   });
@@ -113,9 +114,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(vi.signOutFailed), findsOneWidget);
     expect(find.byKey(ParentHomeKeys.screen), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+    app.fake.clearFailures();
+    await tester.tap(find.text(vi.retry));
+    await tester.pumpAndSettle();
+    expect(find.byKey(SignInKeys.screen), findsOneWidget);
   });
 
-  testWidgets('200% text on a phone wraps the name, no overflow', (
+  testWidgets('a failed reload keeps the cached linked-child name', (
+    tester,
+  ) async {
+    final app = await pumpEduApp(tester, signedInAs: FixtureKeys.parentBinh);
+    expect(find.text('Nguyễn Minh An'), findsOneWidget);
+    app.fake.parentError = const UnexpectedBackendError();
+    app.network.goOffline();
+    await tester.pumpAndSettle();
+    app.network.goOnline();
+    await tester.pumpAndSettle();
+    expect(find.text('Nguyễn Minh An'), findsOneWidget);
+    await expectAccessibilityGuidelines(tester);
+  });
+
+  testWidgets('200% text on a phone keeps the name inside the panel', (
     tester,
   ) async {
     await pumpEduApp(
@@ -125,6 +145,15 @@ void main() {
       signedInAs: FixtureKeys.parentBinh,
     );
     expect(tester.takeException(), isNull);
+    final name = find.byKey(ParentHomeKeys.name);
+    expect(name, findsOneWidget);
+    final panel = tester.getRect(find.byKey(ParentHomeKeys.panel));
+    final nameRect = tester.getRect(name);
+    expect(nameRect.left, greaterThanOrEqualTo(panel.left));
+    expect(nameRect.right, lessThanOrEqualTo(panel.right));
+    expect(nameRect.top, greaterThanOrEqualTo(panel.top));
+    expect(nameRect.bottom, lessThanOrEqualTo(panel.bottom));
+    await expectAccessibilityGuidelines(tester);
   });
 
   for (final (name, size) in [

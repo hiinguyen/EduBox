@@ -66,6 +66,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> clearRoleHome(EduBoxDatabase db, String role) async {
+    switch (role) {
+      case 'student':
+        await db.delete(db.cachedLibraryItems).go();
+        await db.delete(db.cachedLibraryClasses).go();
+        await (db.delete(
+          db.cachedSnapshots,
+        )..where((t) => t.kind.equals('studentLibrary'))).go();
+        break;
+      case 'teacher':
+        await db.delete(db.cachedClasses).go();
+        await (db.delete(
+          db.cachedSnapshots,
+        )..where((t) => t.kind.equals('teacherClasses'))).go();
+        break;
+      case 'parent':
+        await db.delete(db.cachedParentHomes).go();
+        await (db.delete(
+          db.cachedSnapshots,
+        )..where((t) => t.kind.equals('parentHome'))).go();
+        break;
+    }
+  }
+
   for (final (role, key, probe) in [
     ('student', FixtureKeys.studentAn, 'Tế bào và mô'),
     ('teacher', FixtureKeys.teacherLan, '7A'),
@@ -92,28 +116,28 @@ void main() {
     });
   }
 
-  testWidgets('cleared cache: offline re-create shows offline-no-data', (
-    tester,
-  ) async {
-    setWindow(tester, TestSizes.tablet);
-    final network = ManualNetworkController();
-    final first = await pumpRoot(tester, network);
-    await signIn(tester, FixtureKeys.teacherLan);
-    // Clear only this role's home data, as the E2E criterion 6 test does.
-    await tester.runAsync(() async {
-      final db = first.store.db;
-      await db.delete(db.cachedClasses).go();
-      await (db.delete(
-        db.cachedSnapshots,
-      )..where((t) => t.kind.equals('teacherClasses'))).go();
+  for (final (role, key, message) in [
+    ('student', FixtureKeys.studentAn, vi.studentHomeLibraryOfflineNoCache),
+    ('teacher', FixtureKeys.teacherLan, vi.teacherClassesOfflineNoData),
+    ('parent', FixtureKeys.parentBinh, vi.parentHomeOfflineNoData),
+  ]) {
+    testWidgets('$role: cleared cache offline re-create shows no data', (
+      tester,
+    ) async {
+      setWindow(tester, TestSizes.tablet);
+      final network = ManualNetworkController();
+      final first = await pumpRoot(tester, network);
+      await signIn(tester, key);
+      // Clear only this role's home data, as the E2E criterion 6 test does.
+      await tester.runAsync(() => clearRoleHome(first.store.db, role));
+      network.goOffline();
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(first.dispose);
+      final second = await pumpRoot(tester, network);
+      expect(find.text(message), findsOneWidget);
+      expect(find.text(vi.teacherClassesEmpty), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(second.dispose);
     });
-    network.goOffline();
-    await tester.pumpWidget(const SizedBox());
-    await tester.runAsync(first.dispose);
-    final second = await pumpRoot(tester, network);
-    expect(find.text(vi.teacherClassesOfflineNoData), findsOneWidget);
-    expect(find.text(vi.teacherClassesEmpty), findsNothing);
-    await tester.pumpWidget(const SizedBox());
-    await tester.runAsync(second.dispose);
-  });
+  }
 }

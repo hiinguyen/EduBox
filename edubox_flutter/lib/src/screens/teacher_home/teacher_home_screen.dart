@@ -334,9 +334,11 @@ class _StackedRows extends StatelessWidget {
                         Expanded(
                           child: Text(item.name, style: text.titleSmall),
                         ),
-                        Text(
-                          l10n.classStudentCount(item.studentCount),
-                          style: extras.figureTeacher,
+                        _FigureText(
+                          text: l10n.classStudentCount(item.studentCount),
+                          figure: EduFormat.figure(item.studentCount),
+                          style: text.bodyMedium!,
+                          figureStyle: extras.figureTeacher,
                         ),
                       ],
                     ),
@@ -344,9 +346,13 @@ class _StackedRows extends StatelessWidget {
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          l10n.classGradeValue(item.gradeLevel),
-                          style: extras.figureTeacher,
+                        _FigureText(
+                          text: l10n.classGradeValue(item.gradeLevel),
+                          figure: EduFormat.figure(item.gradeLevel),
+                          style: muted,
+                          figureStyle: extras.figureTeacher.copyWith(
+                            color: palette.muted,
+                          ),
                         ),
                         const MetaDot(),
                         _Subjects(subjects: item.subjects, style: muted),
@@ -359,6 +365,39 @@ class _StackedRows extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// A localized line whose figure alone is set in mono when the string
+/// already contains that formatted figure (no extra ARB key needed).
+class _FigureText extends StatelessWidget {
+  const _FigureText({
+    required this.text,
+    required this.figure,
+    required this.style,
+    required this.figureStyle,
+  });
+
+  final String text;
+  final String figure;
+  final TextStyle style;
+  final TextStyle figureStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = text.indexOf(figure);
+    if (start < 0) return Text(text, style: style);
+    final end = start + figure.length;
+    return Text.rich(
+      TextSpan(
+        children: [
+          if (start > 0) TextSpan(text: text.substring(0, start)),
+          TextSpan(text: figure, style: figureStyle),
+          if (end < text.length) TextSpan(text: text.substring(end)),
+        ],
+      ),
+      style: style,
     );
   }
 }

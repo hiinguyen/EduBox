@@ -310,9 +310,17 @@ class _ExtendedDestination extends StatelessWidget {
                         color: color,
                       ),
                       const SizedBox(width: EduSpace.s12),
-                      Text(
-                        destination.label,
-                        style: text.labelMedium!.copyWith(color: color),
+                      Flexible(
+                        child: Text(
+                          destination.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.labelMedium!.copyWith(
+                            fontSize: 14,
+                            height: 20 / 14,
+                            color: color,
+                          ),
+                        ),
                       ),
                     ],
                   ),

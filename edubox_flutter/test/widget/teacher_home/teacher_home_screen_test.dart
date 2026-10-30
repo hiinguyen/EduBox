@@ -224,9 +224,25 @@ void main() {
     final count = tester.widget<Text>(
       find.text(vi.classStudentCount(1)).first,
     );
-    expect(count.style?.fontFamily, EduFonts.mono);
+    final countSpans = (count.textSpan! as TextSpan).children!.cast<TextSpan>();
+    expect(count.style?.fontFamily, isNot(EduFonts.mono));
+    final countFigure = countSpans.firstWhere((span) => span.text == '1');
+    expect(countFigure.style?.fontFamily, EduFonts.mono);
+    final countUnit = countSpans.firstWhere(
+      (span) => span.text!.contains('học sinh'),
+    );
+    expect(countUnit.style?.fontFamily, isNot(EduFonts.mono));
+
     final grade = tester.widget<Text>(find.text(vi.classGradeValue(7)).first);
-    expect(grade.style?.fontFamily, EduFonts.mono);
+    expect(grade.style?.color, EduColors.muted);
+    final gradeSpans = (grade.textSpan! as TextSpan).children!.cast<TextSpan>();
+    final gradeFigure = gradeSpans.firstWhere((span) => span.text == '7');
+    expect(gradeFigure.style?.fontFamily, EduFonts.mono);
+    expect(gradeFigure.style?.color, EduColors.muted);
+    final gradeLabel = gradeSpans.firstWhere(
+      (span) => span.text == 'Khối ',
+    );
+    expect(gradeLabel.style?.fontFamily, isNot(EduFonts.mono));
     expect(find.byType(NavigationBar), findsNothing);
     await expectAccessibilityGuidelines(tester);
     await tester.tap(find.byKey(const Key('shell.accountMenu')));
@@ -274,6 +290,29 @@ void main() {
       [vi.navTeacherOverview],
     );
   });
+
+  for (final (name, size) in [
+    ('medium', TestSizes.tabletPortrait),
+    ('expanded', TestSizes.smallLandscape),
+  ]) {
+    testWidgets('$name: 88dp rail, table, and the account menu', (
+      tester,
+    ) async {
+      await pumpEduApp(
+        tester,
+        size: size,
+        signedInAs: FixtureKeys.teacherLan,
+      );
+      final rail = tester.widget<NavigationRail>(
+        find.byType(NavigationRail),
+      );
+      expect(rail.minWidth, EduSize.railCollapsed);
+      expect(find.byKey(TeacherHomeKeys.table), findsOneWidget);
+      expect(find.byKey(const Key('shell.accountMenu')), findsOneWidget);
+      expect(find.byKey(const Key('shell.railSignOut')), findsNothing);
+      await expectAccessibilityGuidelines(tester);
+    });
+  }
 
   testWidgets('tablet: the active label sits inside its nav pill', (
     tester,

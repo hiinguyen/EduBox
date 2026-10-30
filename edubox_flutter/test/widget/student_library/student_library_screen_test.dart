@@ -213,19 +213,24 @@ void main() {
     expect(await rowInset(TestSizes.tablet), 24);
   });
 
-  testWidgets('200% text: one column, no overflow', (tester) async {
-    await openLibrary(tester, size: TestSizes.tablet, textScale: 2);
-    expect(tester.takeException(), isNull);
-    final first = tester.getTopLeft(
-      find.text('Luyện tập: Phép cộng phân số').first,
-    );
-    final second = tester.getTopLeft(
-      find.text('Phân số và số thập phân').first,
-    );
-    expect(first.dx, second.dx);
-    expect(second.dy, greaterThan(first.dy));
-    await expectAccessibilityGuidelines(tester);
-  });
+  for (final (name, size) in [
+    ('tablet', TestSizes.tablet),
+    ('phone', TestSizes.phone),
+  ]) {
+    testWidgets('200% text on $name: one column, no overflow', (tester) async {
+      await openLibrary(tester, size: size, textScale: 2);
+      expect(tester.takeException(), isNull);
+      final first = tester.getTopLeft(
+        find.text('Luyện tập: Phép cộng phân số').first,
+      );
+      final second = tester.getTopLeft(
+        find.text('Phân số và số thập phân').first,
+      );
+      expect(first.dx, second.dx);
+      expect(second.dy, greaterThan(first.dy));
+      await expectAccessibilityGuidelines(tester);
+    });
+  }
 
   for (final (name, size) in [
     ('phone', TestSizes.phone),

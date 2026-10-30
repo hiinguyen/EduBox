@@ -92,6 +92,9 @@ void main() {
   );
 
   test('a failing reconnect refresh is contained', () async {
+    // Close the shared store first so only one EduBoxDatabase is open at a
+    // time (drift warns, and a real double-open is what that guard catches).
+    await store.close();
     final brokenStore = _ThrowingReadStore(EduBoxDatabase.inMemory());
     final brokenBackend = CachedBackend(
       api: FixtureEduBoxApi(),
@@ -169,6 +172,7 @@ void main() {
   });
 
   test('sign-out reports a local clear failure instead of throwing', () async {
+    await store.close();
     final failingApi = _ClearAuthFailsApi();
     final failingStore = CachedDataStore(EduBoxDatabase.inMemory());
     final failingBackend = CachedBackend(
@@ -193,6 +197,7 @@ void main() {
   });
 
   test('a sign-in failure after login clears the stored auth', () async {
+    await store.close();
     final failingApi = _ProfileFailsApi();
     final failingStore = CachedDataStore(EduBoxDatabase.inMemory());
     final failingBackend = CachedBackend(

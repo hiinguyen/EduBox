@@ -18,6 +18,7 @@ void main() {
     final harness = E2eHarness(
       config: const BackendConfig(serverUrl: 'http://10.0.2.2:8099'),
     );
+    addTearDown(harness.dispose);
     await harness.setUp();
     await harness.pumpRoot(tester);
     await harness.signIn(tester, FixtureKeys.studentAn);
@@ -25,6 +26,5 @@ void main() {
     expect(find.text(vi.backendUnreachable), findsOneWidget);
     expect(find.byKey(SignInKeys.retry), findsOneWidget);
     expect(find.text(vi.retry), findsOneWidget);
-    await harness.dispose();
   });
 }

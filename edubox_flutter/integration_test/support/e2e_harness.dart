@@ -103,6 +103,8 @@ class E2eHarness {
 
   /// Signs out from whichever shell control the window class exposes: the
   /// extended rail's button, or the account menu below the large class.
+  /// Teacher, parent and not-set-up only: a student's sign-out needs the
+  /// confirmation dialog, which this helper does not tap.
   Future<void> signOut(WidgetTester tester) async {
     final railSignOut = find.byKey(const Key('shell.railSignOut'));
     if (railSignOut.evaluate().isNotEmpty) {

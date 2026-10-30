@@ -138,9 +138,15 @@ void main() {
       if (key == FixtureKeys.studentAn) {
         await tester.tap(find.byKey(StudentHomeKeys.openLibrary));
         await settle(tester);
-        expect(find.text(vi.libraryTotal(6)), findsOneWidget);
+        expect(
+          find.text(
+            vi.libraryTotal(
+              fixtures.libraryOfStudent(FixtureKeys.studentAn).length,
+            ),
+          ),
+          findsOneWidget,
+        );
       }
-      harness.network.goOnline();
     });
   }
 
@@ -163,7 +169,6 @@ void main() {
         await settle(tester);
         expect(find.text(vi.libraryOfflineNoData), findsOneWidget);
       }
-      harness.network.goOnline();
     });
   }
 
@@ -177,15 +182,23 @@ void main() {
     expect(find.text(vi.networkOffline), findsOneWidget);
     await harness.control('reconnect-library');
     harness.network.goOnline();
-    // The strip is transient: pump in a bounded loop until it appears or
-    // the reload lands, then assert the final online state.
+    // The strip is transient: pump in a bounded loop until it appears, so
+    // the run proves the reconnecting half and cannot hang.
+    var sawReconnecting = false;
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (DateTime.now().isBefore(deadline)) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.text(vi.networkReconnecting).evaluate().isNotEmpty) break;
-      if (find.text('Ôn tập chương 1').evaluate().isNotEmpty) break;
+      if (find.text(vi.networkReconnecting).evaluate().isNotEmpty) {
+        sawReconnecting = true;
+        break;
+      }
     }
-    await waitFor(tester, find.text('Ôn tập chương 1'));
+    expect(
+      sawReconnecting,
+      isTrue,
+      reason: 'the networkReconnecting strip was never shown',
+    );
+    await waitFor(tester, find.text(reconnectDeltaContent.title));
     await settle(tester);
     expect(find.text(vi.networkReconnecting), findsNothing);
     expect(find.text(vi.networkOffline), findsNothing);
@@ -198,9 +211,10 @@ void main() {
     await settle(tester);
     await harness.control('reconnect-classes');
     harness.network.goOnline();
-    await waitFor(tester, find.text('8B'));
+    await waitFor(tester, find.text(reconnectDeltaClass.name));
     await settle(tester);
     expect(find.text(vi.networkReconnecting), findsNothing);
+    expect(find.text(vi.networkOffline), findsNothing);
   });
 
   testWidgets('9: pingStream reaches the app with the caller role', (
@@ -208,7 +222,10 @@ void main() {
   ) async {
     await harness.pumpRoot(tester);
     await harness.signIn(tester, FixtureKeys.teacherLan);
-    final messages = await harness.backend.diagnostics.pingStream().toList();
+    final messages = await harness.backend.diagnostics
+        .pingStream()
+        .toList()
+        .timeout(const Duration(seconds: 30));
     expect(messages.length, greaterThanOrEqualTo(2));
     expect(messages.every((m) => m.role.name == 'teacher'), isTrue);
   });
