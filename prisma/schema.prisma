@@ -1,0 +1,742 @@
+// EduBox data model. This file is the stable contract for every domain agent:
+// add columns only through a new migration reviewed by the foundation owner.
+//
+// Conventions
+// - cuid ids, createdAt/updatedAt on mutable rows, explicit onDelete everywhere.
+// - Ownership paths are indexed: parent -> child, teacher -> class, student -> class/attempt.
+// - Every list query paginates; the composite indexes below match the sort orders used.
+// - Scores are Float on a 10-point scale; round at the presentation boundary.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  STUDENT
+  PARENT
+  TEACHER
+}
+
+/// Colour family used by course, material and chart cards.
+enum CardTone {
+  PRIMARY
+  SECONDARY
+  TERTIARY
+}
+
+enum Subject {
+  MATH
+  PHYSICS
+  CHEMISTRY
+  ENGLISH
+}
+
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AssessmentKind {
+  HOMEWORK
+  QUIZ
+  EXAM
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  ESSAY
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum ChatRole {
+  STUDENT
+  ASSISTANT
+}
+
+enum ActivityKind {
+  EXAM_COMPLETED
+  LECTURE_WATCHED
+  AI_TUTOR
+  HOMEWORK_SUBMITTED
+}
+
+enum NotificationKind {
+  GRADE_PUBLISHED
+  TEACHER_NOTE
+  DEADLINE
+  GENERAL
+}
+
+enum GapTone {
+  MASTERED
+  CONFUSED
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credential     Credential?
+  studentProfile StudentProfile?
+  parentProfile  ParentProfile?
+  teacherProfile TeacherProfile?
+  notifications  Notification[]
+
+  @@index([role])
+}
+
+/// Password hash lives apart from User so no default `select` can ever leak it.
+/// Only src/lib/auth/credentials.ts may read this table.
+model Credential {
+  userId       String   @id
+  passwordHash String
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudentProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  studentCode       String   @unique
+  weeklyGoalMinutes Int      @default(960)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parents           ParentChild[]
+  enrollments       Enrollment[]
+  courseEnrollments CourseEnrollment[]
+  lessonProgress    LessonProgress[]
+  notes             Note[]
+  chatThreads       ChatThread[]
+  attempts          ExamAttempt[]
+  submissions       Submission[]
+  activities        ActivityLog[]
+  teacherNotes      ParentTeacherNote[]
+  studyDays         StudyDay[]
+  subjectScores     SubjectWeekScore[]
+  badges            StudentBadge[]
+  devices           StudentDevice[]
+}
+
+model ParentProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children     ParentChild[]
+  acknowledged ParentTeacherNote[]
+}
+
+model TeacherProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  department   String
+  subjectLabel String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classes     TeacherClass[]
+  lessons     Lesson[]
+  materials   Material[]
+  assessments Assessment[]
+  grades      Grade[]
+  notes       ParentTeacherNote[]
+  insight     TeacherInsight?
+}
+
+/// Ownership link: a parent may only see the students listed here.
+model ParentChild {
+  parentId  String
+  studentId String
+  createdAt DateTime @default(now())
+
+  parent   ParentProfile   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student  StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  settings ParentSettings?
+
+  @@id([parentId, studentId])
+  @@index([studentId])
+}
+
+/// Per parent-and-child preferences (night limit, Zalo/SMS alerts).
+model ParentSettings {
+  parentId           String
+  studentId          String
+  isNightLimitOn     Boolean  @default(true)
+  /// Minutes after midnight when learning devices lock (23:30 = 1410).
+  nightLimitStartMin Int      @default(1410)
+  isInstantAlertOn   Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+
+  link ParentChild @relation(fields: [parentId, studentId], references: [parentId, studentId], onDelete: Cascade)
+
+  @@id([parentId, studentId])
+}
+
+model StudentDevice {
+  id         String   @id @default(cuid())
+  studentId  String
+  name       String
+  lastSeenAt DateTime @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ---------------------------------------------------------------------------
+// Classes
+// ---------------------------------------------------------------------------
+
+model SchoolClass {
+  id           String   @id @default(cuid())
+  name         String
+  trackLabel   String
+  subjectLabel String
+  termLabel    String
+  academicYear String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teachers    TeacherClass[]
+  enrollments Enrollment[]
+  lessons     LessonClass[]
+  assessments Assessment[]
+
+  @@unique([academicYear, name])
+}
+
+model Enrollment {
+  classId   String
+  studentId String
+  createdAt DateTime @default(now())
+
+  class   SchoolClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([classId, studentId])
+  @@index([studentId])
+}
+
+/// Ownership link: a teacher may only act on the classes listed here.
+model TeacherClass {
+  teacherId String
+  classId   String
+  createdAt DateTime @default(now())
+
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class   SchoolClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, classId])
+  @@index([classId])
+}
+
+// ---------------------------------------------------------------------------
+// Learning content
+// ---------------------------------------------------------------------------
+
+model Course {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  subjectLabel    String
+  title           String
+  instructorLabel String
+  durationMinutes Int
+  lessonCount     Int
+  icon            String
+  tone            CardTone
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  enrollments CourseEnrollment[]
+  lessons     Lesson[]
+}
+
+model CourseEnrollment {
+  courseId        String
+  studentId       String
+  /// Last lesson the student reached (1-based), shown as "Bài 4/18".
+  currentLesson   Int      @default(1)
+  progressPercent Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, studentId])
+  @@index([studentId, updatedAt])
+}
+
+/// A video lesson. Teacher lectures set authorId and are published to classes;
+/// catalogue lessons may belong to a Course instead.
+model Lesson {
+  id              String       @id @default(cuid())
+  courseId        String?
+  authorId        String?
+  number          Int?
+  title           String
+  subtitle        String?
+  topic           String?
+  heading         String?
+  instructorLabel String?
+  durationSeconds Int
+  quality         String?
+  videoUrl        String?
+  handoutName     String?
+  status          LessonStatus @default(DRAFT)
+  /// Denormalised counters maintained by the teacher domain.
+  viewCount       Int          @default(0)
+  ratingAverage   Float?
+  ratingCount     Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  course   Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  author   TeacherProfile?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  chapters LessonChapter[]
+  progress LessonProgress[]
+  notes    Note[]
+  classes  LessonClass[]
+
+  @@index([courseId, number])
+  @@index([authorId, status, createdAt])
+}
+
+model LessonClass {
+  lessonId String
+  classId  String
+
+  lesson Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  class  SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@id([lessonId, classId])
+  @@index([classId])
+}
+
+/// Chapter marker on the video timeline.
+model LessonChapter {
+  id           String @id @default(cuid())
+  lessonId     String
+  slug         String
+  startSeconds Int
+  title        String
+  note         String
+  currentNote  String
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, slug])
+  @@index([lessonId, startSeconds])
+}
+
+model LessonProgress {
+  studentId       String
+  lessonId        String
+  positionSeconds Int      @default(0)
+  isCompleted     Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, lessonId])
+  @@index([lessonId])
+  @@index([studentId, updatedAt])
+}
+
+/// A student's own timestamped note on a lesson.
+model Note {
+  id        String   @id @default(cuid())
+  studentId String
+  lessonId  String
+  atSeconds Int
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, lessonId, atSeconds])
+}
+
+/// Library material visible to every student.
+model Material {
+  id            String   @id @default(cuid())
+  uploaderId    String?
+  subject       Subject
+  kind          String
+  title         String
+  detail        String
+  icon          String
+  tone          CardTone
+  footnote      String
+  isRecommended Boolean  @default(false)
+  fileUrl       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  uploader TeacherProfile? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([subject, createdAt])
+  @@index([uploaderId])
+}
+
+// ---------------------------------------------------------------------------
+// AI tutor
+// ---------------------------------------------------------------------------
+
+model ChatThread {
+  id        String   @id @default(cuid())
+  studentId String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([studentId, updatedAt])
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  threadId    String
+  role        ChatRole
+  text        String
+  quote       String?
+  highlight   String?
+  suggestions String[]
+  createdAt   DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Assessments, exams and grading
+// ---------------------------------------------------------------------------
+
+model Assessment {
+  id                     String           @id @default(cuid())
+  classId                String
+  creatorId              String
+  kind                   AssessmentKind
+  subject                Subject
+  title                  String
+  subtitle               String?
+  kindLabel              String?
+  proctorStatus          String?
+  essayPrompt            String?
+  durationMinutes        Int?
+  maxScore               Float            @default(10)
+  multipleChoiceMaxScore Float            @default(10)
+  essayMaxScore          Float            @default(0)
+  status                 AssessmentStatus @default(DRAFT)
+  isOnline               Boolean          @default(true)
+  dueAt                  DateTime?
+  gradingDueAt           DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  class       SchoolClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  creator     TeacherProfile @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  questions   Question[]
+  attempts    ExamAttempt[]
+  submissions Submission[]
+
+  @@index([classId, status, dueAt])
+  @@index([creatorId, createdAt])
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  assessmentId String
+  number       Int
+  type         QuestionType @default(MULTIPLE_CHOICE)
+  /// Array of { kind: "text" | "math" | "code", text } segments, validated with Zod.
+  prompt       Json
+  levelLabel   String
+  points       Float
+  /// Optional figure descriptor (for example the derivative graph), validated with Zod.
+  figure       Json?
+
+  assessment Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  options    Option[]
+  key        AnswerKey?
+  answers    AttemptAnswer[]
+
+  @@unique([assessmentId, number])
+}
+
+/// Never carries correctness: that lives in AnswerKey so `include: { options: true }` cannot leak it.
+model Option {
+  id         String @id @default(cuid())
+  questionId String
+  label      String
+  text       String
+
+  question Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  key      AnswerKey?
+  answers  AttemptAnswer[]
+
+  @@unique([questionId, label])
+}
+
+/// SERVER-ONLY. The correct option of a multiple choice question.
+/// Never select this model in code that builds a response for a student.
+model AnswerKey {
+  questionId String @id
+  optionId   String @unique
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option   Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
+
+/// One attempt per student and assessment. startedAt and endsAt are set by the server only.
+model ExamAttempt {
+  id           String        @id @default(cuid())
+  assessmentId String
+  studentId    String
+  status       AttemptStatus @default(IN_PROGRESS)
+  startedAt    DateTime      @default(now())
+  endsAt       DateTime
+  submittedAt  DateTime?
+  currentIndex Int           @default(0)
+  updatedAt    DateTime      @updatedAt
+
+  assessment Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers    AttemptAnswer[]
+  submission Submission?
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId, status])
+}
+
+model AttemptAnswer {
+  attemptId  String
+  questionId String
+  optionId   String?
+  essayText  String?
+  isFlagged  Boolean  @default(false)
+  answeredAt DateTime @default(now())
+
+  attempt  ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option   Option?     @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@id([attemptId, questionId])
+  @@index([questionId])
+}
+
+/// A student's finished work, waiting for (or carrying) a Grade.
+model Submission {
+  id                  String   @id @default(cuid())
+  assessmentId        String
+  studentId           String
+  attemptId           String?  @unique
+  code                String
+  multipleChoiceScore Float
+  /// Cached AI grading hint { comment, suggestedScore, feedbackDraft }, validated with Zod.
+  aiSuggestion        Json?
+  submittedAt         DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  assessment Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attempt    ExamAttempt?   @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  grade      Grade?
+
+  @@unique([assessmentId, studentId])
+  @@unique([assessmentId, code])
+  @@index([assessmentId, submittedAt])
+  @@index([studentId, submittedAt])
+}
+
+/// A submission without a Grade row is pending teacher review.
+model Grade {
+  submissionId String    @id
+  gradedById   String
+  essayScore   Float
+  feedback     String?
+  gradedAt     DateTime  @default(now())
+  notifiedAt   DateTime?
+
+  submission Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  gradedBy   TeacherProfile @relation(fields: [gradedById], references: [id], onDelete: Restrict)
+
+  @@index([gradedById, gradedAt])
+}
+
+/// Cached AI analysis of a teacher's recent submissions.
+model TeacherInsight {
+  teacherId          String   @id
+  scannedSubmissions Int
+  remediationIntro   String
+  remediationLecture String
+  remediationOutro   String
+  updatedAt          DateTime @updatedAt
+
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  gaps    KnowledgeGap[]
+}
+
+model KnowledgeGap {
+  id        String  @id @default(cuid())
+  teacherId String
+  position  Int
+  topic     String
+  percent   Int
+  tone      GapTone
+  note      String
+
+  insight TeacherInsight @relation(fields: [teacherId], references: [teacherId], onDelete: Cascade)
+
+  @@unique([teacherId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Parent portal, progress and notifications
+// ---------------------------------------------------------------------------
+
+/// Contact book entry from a teacher about one student, readable by that student's parents.
+model ParentTeacherNote {
+  id               String    @id @default(cuid())
+  studentId        String
+  teacherId        String
+  subject          String
+  weekLabel        String
+  message          String
+  createdAt        DateTime  @default(now())
+  readAt           DateTime?
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+
+  student        StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher        TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  acknowledgedBy ParentProfile? @relation(fields: [acknowledgedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId, createdAt])
+  @@index([teacherId, createdAt])
+}
+
+model ActivityLog {
+  id          String       @id @default(cuid())
+  studentId   String
+  kind        ActivityKind
+  title       String
+  /// Array of { text, isEmphasis? } segments, validated with Zod.
+  description Json
+  /// Array of { label, tone } tags, validated with Zod.
+  tags        Json
+  occurredAt  DateTime
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, occurredAt])
+}
+
+/// Study time per student and calendar day; weekly hours and streaks derive from it.
+model StudyDay {
+  studentId      String
+  day            DateTime @db.Date
+  studiedSeconds Int
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, day])
+}
+
+/// Average assessment score per subject and week, used by the parent progress chart.
+model SubjectWeekScore {
+  studentId String
+  subject   Subject
+  weekStart DateTime @db.Date
+  score     Float
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, subject, weekStart])
+}
+
+model Badge {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  title               String
+  description         String
+  weeklyMinutesToEarn Int
+  createdAt           DateTime @default(now())
+
+  students StudentBadge[]
+}
+
+model StudentBadge {
+  studentId String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  badge   Badge          @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, badgeId])
+  @@index([badgeId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  kind      NotificationKind
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// Postgres-backed fixed-window rate limiter (src/lib/rate-limit).
+model RateLimitBucket {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+
+  @@index([windowStart])
+}
